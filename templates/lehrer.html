@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BeBoDiktat - Lehreransicht</title>
+    <title>BeBoDiktat - Lehrpersonen-Ansicht</title>
     <style>
         /* Retro-Hintergrundraster (genau wie im BeBo-Korrektur-Tool) */
         body {
@@ -40,7 +40,7 @@
             background: #333333;
             padding: 20px;
             border-radius: 10px;
-            max-width: 1000px;
+            max-width: 900px;
             margin: 20px auto;
             box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
             border: 3px solid #ff9900;
@@ -143,6 +143,7 @@
             background-color: #222222;
             border: 2px solid #ff9900;
             cursor: pointer;
+            font-size: 0.9em;
         }
 
         .tab.active {
@@ -332,10 +333,59 @@
                 flex-direction: column;
                 align-items: center;
                 text-align: center;
+                padding: 10px;
+                width: 90%;
             }
 
             .text-section {
                 padding-right: 0;
+                width: 100%;
+            }
+            
+            .tabs {
+                flex-wrap: wrap;
+            }
+            
+            .tab {
+                padding: 8px 5px;
+                font-size: 0.7em;
+            }
+            
+            .speed-control {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .speed-control label {
+                margin-bottom: 5px;
+            }
+            
+            .diktat-id {
+                font-size: 18px;
+                word-break: break-all;
+            }
+            
+            .results-table {
+                font-size: 0.7em;
+            }
+            
+            .results-table th, .results-table td {
+                padding: 5px;
+            }
+            
+            .dictation-id {
+                font-size: 16px;
+            }
+            
+            pre {
+                white-space: pre-wrap;
+                word-break: break-word;
+                max-width: 100%;
+                overflow-x: auto;
+            }
+            
+            .image-section {
+                display: none;
             }
         }
     </style>
@@ -345,8 +395,8 @@
     <div class="container">
         <!-- Linker Bereich mit Text -->
         <div class="text-section">
-            <h1>BeBoDiktat – Lehreransicht</h1>
-            <p>Hier kannst du Diktate erstellen und verwalten sowie die Ergebnisse deiner Schüler einsehen.</p>
+            <h1>BeBoDiktat – Lehrpersonen-Ansicht</h1>
+            <p>Hier kannst du Diktate erstellen und verwalten sowie die Ergebnisse deiner Schüler:innen einsehen.</p>
             
             <!-- Tabs -->
             <div class="tabs">
@@ -375,9 +425,9 @@
                 
                 <!-- Info-Box für generierte Diktat-ID (anfangs versteckt) -->
                 <div id="dictation-info" class="info-box" style="display: none;">
-                    <p>Dein Diktat wurde erstellt! Teile diese ID mit deinen Schülern:</p>
+                    <p>Dein Diktat wurde erstellt! Teile diese ID mit deinen Schüler:innen:</p>
                     <div class="diktat-id" id="generated-id">XXXXXX</div>
-                    <p>Schüler können mit dieser ID auf das Diktat zugreifen.</p>
+                    <p>Schüler:innen können mit dieser ID auf das Diktat zugreifen.</p>
                 </div>
             </div>
             
@@ -409,7 +459,7 @@
             
             <!-- Tab: Ergebnisse -->
             <div id="results-tab" class="tab-content">
-                <h2>Schülerergebnisse</h2>
+                <h2>Schüler:innen-Ergebnisse</h2>
                 <button id="refresh-results">Ergebnisse aktualisieren</button>
                 
                 <table class="results-table">
@@ -483,6 +533,35 @@
                 .replace(/\'/g, ' Apostroph ')
                 .replace(/-/g, ' Bindestrich ')
                 .replace(/\//g, ' Schrägstrich ');
+        }
+        
+        // Universelle Sprachfunktion mit Fallback
+        function speakText(text, rate) {
+            // Stoppe laufende Sprachausgabe
+            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
+            }
+            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+            }
+            
+            // Versuche ResponsiveVoice zu nutzen
+            if (typeof responsiveVoice !== 'undefined') {
+                try {
+                    responsiveVoice.speak(text, 'Deutsch Male', { rate: rate });
+                    return;
+                } catch (e) {
+                    console.log("ResponsiveVoice fehlgeschlagen, nutze Web Speech API als Fallback");
+                }
+            }
+            
+            // Fallback zur Web Speech API
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'de-DE';
+                utterance.rate = rate;
+                window.speechSynthesis.speak(utterance);
+            }
         }
         
         // Tab-Funktionalität
@@ -668,9 +747,25 @@
             // Text mit ausgesprochenen Satzzeichen erstellen
             const textWithSpokenPunctuation = replacePunctuationWithWords(text);
             
-            responsiveVoice.speak(textWithSpokenPunctuation, 'Deutsch Male', {
-                rate: parseFloat(speedRange.value)
-            });
+            // Versuche ResponsiveVoice zu nutzen
+            if (typeof responsiveVoice !== 'undefined') {
+                try {
+                    responsiveVoice.speak(textWithSpokenPunctuation, 'Deutsch Male', {
+                        rate: parseFloat(speedRange.value)
+                    });
+                    return;
+                } catch (e) {
+                    console.log("ResponsiveVoice fehlgeschlagen, nutze Web Speech API als Fallback");
+                }
+            }
+            
+            // Fallback zur Web Speech API
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(textWithSpokenPunctuation);
+                utterance.lang = 'de-DE';
+                utterance.rate = parseFloat(speedRange.value);
+                window.speechSynthesis.speak(utterance);
+            }
         });
         
         // Zurück zur Liste
@@ -680,8 +775,11 @@
             refreshListButton.style.display = 'block';
             
             // Sprachausgabe stoppen
-            if (responsiveVoice.isPlaying()) {
+            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
                 responsiveVoice.cancel();
+            }
+            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
             }
         });
         
