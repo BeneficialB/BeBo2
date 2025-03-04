@@ -124,6 +124,8 @@ def create_dictation():
 @teacher_login_required
 def delete_dictation(dictation_id):
     """Löscht ein Diktat."""
+    print(f"Delete request for dictation_id: {dictation_id}")
+    
     if dictation_id not in dictations:
         return jsonify({"error": "Diktat nicht gefunden."}), 404
     
@@ -189,6 +191,8 @@ def check_dictation():
     dictation_id = request.form.get("dictation_id")
     user_text = request.form.get("user_text")
     student_name = request.form.get("student_name", "Unbekannt")
+    
+    print(f"Checking dictation: {dictation_id}, student: {student_name}")
     
     if not dictation_id or not user_text:
         return jsonify({"error": "Fehlende Eingaben."}), 400
