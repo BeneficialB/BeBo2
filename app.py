@@ -157,6 +157,20 @@ def get_dictation(dictation_id):
     
     return jsonify(dictation)
 
+@app.route("/get_dictation_audio/<dictation_id>")
+def get_dictation_audio(dictation_id):
+    """Gibt den Diktattext für die Sprachausgabe zurück (keine visuelle Anzeige für Schüler)."""
+    print(f"Audio request for dictation_id: {dictation_id}")
+    
+    if dictation_id not in dictations:
+        return jsonify({"error": "Diktat nicht gefunden."}), 404
+    
+    # Nur Text und Geschwindigkeit zurückgeben, für die Sprachausgabe
+    return jsonify({
+        "text": dictations[dictation_id]["text"],
+        "speed": dictations[dictation_id]["speed"]
+    })
+
 @app.route("/get_dictations")
 @teacher_login_required
 def get_dictations():
