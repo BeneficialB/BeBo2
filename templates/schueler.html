@@ -318,8 +318,13 @@
                     <label for="student-name">Dein Name:</label>
                     <input type="text" id="student-name" placeholder="Dein Name" required>
                     
-                    <button type="submit">Diktat laden</button>
+                    <button type="submit" id="submit-button">Diktat laden</button>
                 </form>
+                
+                <!-- Fallback-Button für mobile Geräte -->
+                <button id="manual-submit" style="margin-top: 10px; background-color: #ff5500;">
+                    Manuell laden (Fallback)
+                </button>
             </div>
             
             <!-- Diktat-Bereich (anfangs versteckt) -->
@@ -378,6 +383,8 @@
         const idForm = document.getElementById('id-form');
         const dictationIdInput = document.getElementById('dictation-id');
         const studentNameInput = document.getElementById('student-name');
+        const submitButton = document.getElementById('submit-button');
+        const manualSubmitButton = document.getElementById('manual-submit');
         const idInputSection = document.getElementById('id-input-section');
         const dictationSection = document.getElementById('dictation-section');
         const dictationTitle = document.getElementById('dictation-title');
@@ -395,6 +402,14 @@
         const errorMessage = document.getElementById('error-message');
         const statusMessage = document.getElementById('status-message');
         
+        // Überprüfe, ob alle DOM-Elemente korrekt geladen wurden
+        console.log("Formular-Elemente:", {
+            idForm: idForm !== null,
+            idInput: dictationIdInput !== null,
+            nameInput: studentNameInput !== null,
+            submitButton: submitButton !== null
+        });
+        
         // Globale Variablen für das Diktat
         let currentDictationId = null;
         let dictationSpeed = 1.0;
@@ -403,6 +418,7 @@
         
         // Funktion zum Anzeigen von Fehlermeldungen
         function showError(message) {
+            console.log("Fehler:", message);
             errorMessage.textContent = message;
             errorMessage.style.display = 'block';
             setTimeout(() => {
@@ -412,6 +428,7 @@
         
         // Funktion zum Anzeigen von Statusmeldungen
         function showStatus(message) {
+            console.log("Status:", message);
             statusMessage.textContent = message;
             statusMessage.style.display = 'block';
             setTimeout(() => {
@@ -485,30 +502,31 @@
                 .replace(/\s+/g, ' '); // Entfernt mehrfache Leerzeichen
         }
         
-        // Diktat-ID laden
-        idForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const dictationId = dictationIdInput.value.trim().toUpperCase();
-            studentName = studentNameInput.value.trim();
-            
-            // Validierung der Diktat-ID - stellen wir sicher, dass nur Buchstaben und Zahlen enthalten sind
-            const validIdPattern = /^[A-Z0-9]+$/;
+        // Hauptfunktion zum Laden des Diktats
+        async function loadDictation(dictationId, studentNameValue) {
+            console.log("Lade Diktat mit ID:", dictationId, "für:", studentNameValue);
             
             if (!dictationId) {
                 showError('Bitte gib eine Diktat-ID ein!');
-                return;
+                return false;
             }
             
+            // Validierung der Diktat-ID - stellen wir sicher, dass nur Buchstaben und Zahlen enthalten sind
+            const validIdPattern = /^[A-Z0-9]+$/;
             if (!validIdPattern.test(dictationId)) {
                 showError('Die Diktat-ID darf nur Buchstaben und Zahlen enthalten!');
-                return;
+                return false;
             }
             
-            if (!studentName) {
+            if (!studentNameValue) {
                 showError('Bitte gib deinen Namen ein!');
-                return;
+                return false;
             }
+            
+            // Button-Status aktualisieren
+            submitButton.textContent = 'Wird geladen...';
+            submitButton.disabled = true;
+            manualSubmitButton.disabled = true;
             
             try {
                 showStatus("Lade Diktat...");
@@ -525,9 +543,10 @@
                 
                 const dictation = await response.json();
                 
-                // Geschwindigkeit speichern
+                // Globale Werte speichern
                 dictationSpeed = dictation.speed;
                 currentDictationId = dictationId;
+                studentName = studentNameValue;
                 
                 // UI aktualisieren
                 dictationTitle.textContent = dictation.title;
@@ -571,9 +590,38 @@
                     reloadDictationText(dictationId, null); // Probiere einen alternativen Lademechanismus
                 }
                 
+                return true;
+                
             } catch (error) {
                 showError(`${error.message}`);
+                return false;
+            } finally {
+                // Button-Status zurücksetzen
+                submitButton.textContent = 'Diktat laden';
+                submitButton.disabled = false;
+                manualSubmitButton.disabled = false;
             }
+        }
+        
+        // Diktat-ID laden - Event-Listener für das Formular
+        idForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            console.log("Formular wurde abgeschickt");
+            
+            const dictationId = dictationIdInput.value.trim().toUpperCase();
+            const studentNameValue = studentNameInput.value.trim();
+            
+            await loadDictation(dictationId, studentNameValue);
+        });
+        
+        // Fallback-Button für mobile Geräte
+        manualSubmitButton.addEventListener('click', async function() {
+            console.log("Manueller Submit-Button geklickt");
+            
+            const dictationId = dictationIdInput.value.trim().toUpperCase();
+            const studentNameValue = studentNameInput.value.trim();
+            
+            await loadDictation(dictationId, studentNameValue);
         });
         
         // Sprachausgabe vorbereiten
@@ -717,7 +765,7 @@
                 if (currentDictationId) {
                     showError("Lade Diktat neu...");
                     reloadDictationText(currentDictationId, function() {
-                        if (sections && sections.length > 1 && sections[1]) {
+                        if (sections && sections.if (sections && sections.length > 1 && sections[1]) {
                             const textWithPunctuation = replacePunctuationWithWords(sections[1]);
                             speakText(textWithPunctuation, window.diktatSpeed || 1.0);
                         } else {
@@ -767,7 +815,7 @@
             }
             
             try {
-                const formData = new FormDataconst formData = new FormData();
+                const formData = new FormData();
                 formData.append('dictation_id', currentDictationId);
                 formData.append('user_text', userText);
                 formData.append('student_name', studentName);
@@ -842,6 +890,23 @@
             currentDictationId = null;
             sections = [];
         });
+        
+        // Testfunktion - direkt aufrufbar
+        window.testDiktat = function(testId) {
+            // Setze Testdaten für das Formular
+            dictationIdInput.value = testId || "TEST123";
+            studentNameInput.value = "Testname";
+            
+            // Manuell das Formular absenden
+            loadDictation(dictationIdInput.value.trim().toUpperCase(), studentNameInput.value.trim());
+            
+            console.log("Testformular abgeschickt");
+        };
+        
+        // Verzögerung für Mobilgeräte, um sicherzustellen, dass alles geladen ist
+        setTimeout(function() {
+            console.log("Verzögerte Initialisierung für Mobilgeräte abgeschlossen");
+        }, 1000);
     </script>
     
     <!-- ResponsiveVoice Script -->
