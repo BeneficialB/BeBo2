@@ -467,9 +467,6 @@
         const refreshResultsButton = document.getElementById('refresh-results');
         const resultsBody = document.getElementById('results-body');
         const exportResultsButton = document.getElementById('export-results');
-
-        // Sprachsynthese
-        const synth = window.speechSynthesis;
         
         // Tab-Funktionalität
         tabs.forEach(tab => {
@@ -647,15 +644,13 @@
         testPlaybackButton.addEventListener('click', function() {
             const text = detailText.textContent;
             
-            if (synth.speaking) {
-                synth.cancel();
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
             }
             
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'de-DE';
-            utterance.rate = parseFloat(speedRange.value);
-            
-            synth.speak(utterance);
+            responsiveVoice.speak(text, 'Deutsch Female', {
+                rate: parseFloat(speedRange.value)
+            });
         });
         
         // Zurück zur Liste
@@ -665,8 +660,8 @@
             refreshListButton.style.display = 'block';
             
             // Sprachausgabe stoppen
-            if (synth.speaking) {
-                synth.cancel();
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
             }
         });
         
@@ -799,6 +794,9 @@
             // Standardmäßig den ersten Tab aktivieren
             document.querySelector('.tab.active').click();
         });
-    </script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
+    </script>
+    
+    <!-- ResponsiveVoice Script -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
 </body>
 </html>
