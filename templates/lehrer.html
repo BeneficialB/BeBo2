@@ -171,6 +171,7 @@
             border: 2px solid #ff9900;
             cursor: pointer;
             transition: all 0.3s;
+            position: relative;
         }
 
         .dictation-item:hover {
@@ -193,6 +194,24 @@
             color: #999999;
             font-size: 12px;
             margin-top: 5px;
+        }
+
+        .delete-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #ff5555;
+            color: white;
+            border: none;
+            width: auto;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 10px;
+            animation: none;
+        }
+
+        .delete-button:hover {
+            background-color: #ff3333;
         }
 
         .info-box {
@@ -293,6 +312,21 @@
             margin-top: 20px;
         }
 
+        .logout-button {
+            background-color: #ff5555;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 10px;
+            animation: none;
+        }
+
+        .logout-button:hover {
+            background-color: #ff3333;
+        }
+
         @media (max-width: 768px) {
             .container {
                 flex-direction: column;
@@ -326,23 +360,6 @@
                 <form id="diktat-form">
                     <label for="title">Titel des Diktats:</label>
                     <input type="text" id="title" name="title" required placeholder="z.B. Diktat zum Thema Natur">
-                    
-                    <label for="language">Sprache für Erklärungen:</label>
-                    <select id="language" name="language" required>
-                        <option value="Deutsch">Deutsch</option>
-                        <option value="Englisch">Englisch</option>
-                        <option value="Russisch">Russisch</option>
-                        <option value="Spanisch">Spanisch</option>
-                        <option value="Arabisch">Arabisch</option>
-                        <option value="Französisch">Französisch</option>
-                        <option value="Portugiesisch">Portugiesisch</option>
-                        <option value="Persisch">Persisch</option>
-                        <option value="Ukrainisch">Ukrainisch</option>
-                        <option value="Georgisch">Georgisch</option>
-                        <option value="Armenisch">Armenisch</option>
-                        <option value="Albanisch">Albanisch</option>
-                        <option value="Polnisch">Polnisch</option>
-                    </select>
 
                     <label for="text">Diktattext eingeben:</label>
                     <textarea id="text" name="text" rows="8" required placeholder="Gib hier den Text ein, der als Diktat vorgelesen werden soll..."></textarea>
@@ -382,7 +399,6 @@
                     <p><strong>Titel:</strong> <span id="detail-title"></span></p>
                     <p><strong>ID:</strong> <span id="detail-id"></span></p>
                     <p><strong>Erstellt am:</strong> <span id="detail-date"></span></p>
-                    <p><strong>Sprache:</strong> <span id="detail-language"></span></p>
                     <p><strong>Text:</strong></p>
                     <pre id="detail-text"></pre>
                     
@@ -417,8 +433,11 @@
                 <button id="export-results" class="export-button">Ergebnisse exportieren (CSV)</button>
             </div>
             
-            <!-- Link zurück zur Startseite -->
-            <a href="/" class="home-link">← Zurück zur Startseite</a>
+            <!-- Link zurück zur Startseite und Logout -->
+            <div>
+                <a href="/" class="home-link">← Zurück zur Startseite</a>
+                <a href="/lehrer/logout" class="logout-button">Abmelden</a>
+            </div>
         </div>
 
         <!-- Rechter Bereich mit Bild -->
@@ -442,7 +461,6 @@
         const detailTitle = document.getElementById('detail-title');
         const detailId = document.getElementById('detail-id');
         const detailDate = document.getElementById('detail-date');
-        const detailLanguage = document.getElementById('detail-language');
         const detailText = document.getElementById('detail-text');
         const testPlaybackButton = document.getElementById('test-playback');
         const backToListButton = document.getElementById('back-to-list');
@@ -547,17 +565,58 @@
                         <span class="dictation-id">${dictation.id}</span>
                         <span class="dictation-title">${dictation.title}</span>
                         <span class="dictation-date">Erstellt: ${formatDate(dictation.created_at)}</span>
+                        <button class="delete-button" data-id="${dictation.id}">Löschen</button>
                     `;
                     
                     // Klick-Event für Details
-                    li.addEventListener('click', () => loadDictationDetails(dictation.id));
+                    li.addEventListener('click', function(e) {
+                        // Verhindern, dass der Klick auf den Löschbutton das Diktat öffnet
+                        if (e.target.classList.contains('delete-button')) {
+                            e.stopPropagation();
+                            return;
+                        }
+                        loadDictationDetails(dictation.id);
+                    });
                     
                     dictationList.appendChild(li);
+                });
+                
+                // Event-Listener für Löschbuttons hinzufügen
+                document.querySelectorAll('.delete-button').forEach(button => {
+                    button.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Verhindert, dass der Klick das Diktat öffnet
+                        const dictationId = this.getAttribute('data-id');
+                        if (confirm(`Bist du sicher, dass du das Diktat "${dictationId}" löschen möchtest?`)) {
+                            deleteDictation(dictationId);
+                        }
+                    });
                 });
                 
             } catch (error) {
                 console.error('Fehler beim Laden der Diktate:', error);
                 dictationList.innerHTML = '<li class="dictation-item">Fehler beim Laden der Diktate</li>';
+            }
+        }
+        
+        // Diktat löschen
+        async function deleteDictation(dictationId) {
+            try {
+                const response = await fetch(`/delete_dictation/${dictationId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Fehler beim Löschen des Diktats');
+                }
+                
+                // Liste aktualisieren
+                loadDictations();
+                
+            } catch (error) {
+                console.error('Fehler beim Löschen des Diktats:', error);
+                alert(`Fehler beim Löschen des Diktats: ${error.message}`);
             }
         }
         
@@ -571,7 +630,6 @@
                 detailTitle.textContent = dictation.title;
                 detailId.textContent = dictation.id;
                 detailDate.textContent = formatDate(dictation.created_at);
-                detailLanguage.textContent = dictation.language;
                 detailText.textContent = dictation.text;
                 
                 // UI aktualisieren
