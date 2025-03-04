@@ -315,6 +315,23 @@
         let studentName = '';
         let isPlaying = false;
         
+        // Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
+        function replacePunctuationWithWords(text) {
+            return text
+                .replace(/\./g, ' Punkt ')
+                .replace(/,/g, ' Komma ')
+                .replace(/;/g, ' Semikolon ')
+                .replace(/:/g, ' Doppelpunkt ')
+                .replace(/\?/g, ' Fragezeichen ')
+                .replace(/!/g, ' Ausrufezeichen ')
+                .replace(/\(/g, ' Klammer auf ')
+                .replace(/\)/g, ' Klammer zu ')
+                .replace(/\"/g, ' Anführungszeichen ')
+                .replace(/\'/g, ' Apostroph ')
+                .replace(/-/g, ' Bindestrich ')
+                .replace(/\//g, ' Schrägstrich ');
+        }
+        
         // Diktat-ID laden
         idForm.addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -382,7 +399,7 @@
             window.diktatSpeed = speed;
         }
         
-        // Audio-Steuerung - Vereinfacht auf Play/Stop
+        // Audio-Steuerung - mit Satzzeichen-Ansage
         playButton.addEventListener('click', function() {
             if (window.diktatFullText) {
                 if (responsiveVoice.isPlaying()) {
@@ -391,8 +408,11 @@
                     this.textContent = "Diktat abspielen";
                     isPlaying = false;
                 } else {
+                    // Text mit ausgesprochenen Satzzeichen erstellen
+                    const textWithSpokenPunctuation = replacePunctuationWithWords(window.diktatFullText);
+                    
                     // Wenn gestoppt, dann abspielen und Button-Text ändern
-                    responsiveVoice.speak(window.diktatFullText, 'Deutsch Male', {
+                    responsiveVoice.speak(textWithSpokenPunctuation, 'Deutsch Male', {
                         rate: window.diktatSpeed,
                         onend: function() {
                             playButton.textContent = "Diktat abspielen";
@@ -412,7 +432,10 @@
             }
             
             if (window.diktatFullText) {
-                responsiveVoice.speak(window.diktatFullText, 'Deutsch Male', {
+                // Text mit ausgesprochenen Satzzeichen erstellen
+                const textWithSpokenPunctuation = replacePunctuationWithWords(window.diktatFullText);
+                
+                responsiveVoice.speak(textWithSpokenPunctuation, 'Deutsch Male', {
                     rate: window.diktatSpeed,
                     onend: function() {
                         playButton.textContent = "Diktat abspielen";
