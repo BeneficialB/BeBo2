@@ -5,6 +5,7 @@ import random
 import string
 import json
 from datetime import datetime
+from functools import wraps
 from dotenv import load_dotenv
 
 # Lade die Umgebungsvariablen aus .env
@@ -12,6 +13,9 @@ load_dotenv()
 
 # API-Schlüssel
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+
+# Passwort für den Lehrerbereich
+TEACHER_PASSWORD = "Hamburg1!"
 
 # Überprüfe, ob der Claude API-Key geladen wurde
 if not CLAUDE_API_KEY:
@@ -34,12 +38,42 @@ def generate_dictation_id(length=6):
     characters = string.ascii_uppercase + string.digits
     return ''.join(random.choice(characters) for _ in range(length))
 
+# Dekorator für passwortgeschützte Routen
+def teacher_login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('teacher_logged_in'):
+            return redirect(url_for('teacher_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route("/")
 def index():
     """Render die Startseite mit Auswahlmöglichkeit."""
     return render_template("index.html")
 
+@app.route("/lehrer/login", methods=["GET", "POST"])
+def teacher_login():
+    """Anmeldeseite für den Lehrerbereich."""
+    error = None
+    if request.method == "POST":
+        password = request.form.get("password")
+        if password == TEACHER_PASSWORD:
+            session['teacher_logged_in'] = True
+            return redirect(url_for('teacher_view'))
+        else:
+            error = "Falsches Passwort. Bitte versuche es erneut."
+    
+    return render_template("login.html", error=error)
+
+@app.route("/lehrer/logout")
+def teacher_logout():
+    """Abmelden vom Lehrerbereich."""
+    session.pop('teacher_logged_in', None)
+    return redirect(url_for('index'))
+
 @app.route("/lehrer")
+@teacher_login_required
 def teacher_view():
     """Render die Lehreransicht."""
     return render_template("lehrer.html")
@@ -50,12 +84,12 @@ def student_view():
     return render_template("schueler.html")
 
 @app.route("/create_dictation", methods=["POST"])
+@teacher_login_required
 def create_dictation():
     """Erstellt ein neues Diktat."""
     # Daten aus dem Formular holen
     title = request.form.get("title", "Unbenanntes Diktat")
     text = request.form.get("text")
-    language = request.form.get("language", "Deutsch")
     speed = float(request.form.get("speed", "1.0"))
     
     if not text:
@@ -70,7 +104,6 @@ def create_dictation():
             "id": dictation_id,
             "title": title,
             "text": text,
-            "language": language,
             "speed": speed,
             "created_at": datetime.now().isoformat(),
             "word_count": len(text.split())  # Wortanzahl für die spätere Prozentberechnung
@@ -87,6 +120,26 @@ def create_dictation():
     except Exception as e:
         return jsonify({"error": f"Fehler beim Erstellen des Diktats: {str(e)}"}), 500
 
+@app.route("/delete_dictation/<dictation_id>", methods=["POST"])
+@teacher_login_required
+def delete_dictation(dictation_id):
+    """Löscht ein Diktat."""
+    if dictation_id not in dictations:
+        return jsonify({"error": "Diktat nicht gefunden."}), 404
+    
+    try:
+        # Diktat löschen
+        del dictations[dictation_id]
+        
+        # Zugehörige Ergebnisse löschen
+        global results
+        results = [r for r in results if r["dictation_id"] != dictation_id]
+        
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        return jsonify({"error": f"Fehler beim Löschen des Diktats: {str(e)}"}), 500
+
 @app.route("/get_dictation/<dictation_id>")
 def get_dictation(dictation_id):
     """Gibt Informationen zu einem Diktat zurück, ohne den Originaltext."""
@@ -100,6 +153,7 @@ def get_dictation(dictation_id):
     return jsonify(dictation)
 
 @app.route("/get_dictations")
+@teacher_login_required
 def get_dictations():
     """Gibt eine Liste aller verfügbaren Diktate zurück (nur für Lehreransicht)."""
     # Vereinfachte Liste ohne Originaltexte
@@ -108,13 +162,13 @@ def get_dictations():
         dictation_list.append({
             "id": d_id,
             "title": dictation.get("title", "Unbenanntes Diktat"),
-            "created_at": dictation.get("created_at", ""),
-            "language": dictation.get("language", "Deutsch")
+            "created_at": dictation.get("created_at", "")
         })
     
     return jsonify(dictation_list)
 
 @app.route("/get_full_dictation/<dictation_id>")
+@teacher_login_required
 def get_full_dictation(dictation_id):
     """Gibt vollständige Informationen zu einem Diktat zurück, einschließlich Text (nur für Lehreransicht)."""
     if dictation_id not in dictations:
@@ -137,7 +191,6 @@ def check_dictation():
         return jsonify({"error": "Diktat nicht gefunden."}), 404
     
     original_text = dictations[dictation_id]["text"]
-    language = dictations[dictation_id]["language"]
     dictation_title = dictations[dictation_id]["title"]
     
     try:
@@ -217,6 +270,7 @@ def check_dictation():
         return jsonify({"result": result, "score": 0, "percent": 0})
 
 @app.route("/get_results")
+@teacher_login_required
 def get_results():
     """Gibt eine Liste aller Ergebnisse zurück (nur für Lehreransicht)."""
     return jsonify(results)
