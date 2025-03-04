@@ -142,44 +142,42 @@ def check_dictation():
     
     try:
         # Claude API-Aufruf für die Korrektur
-        # Claude API-Aufruf für die Korrektur
-# Claude API-Aufruf für die Korrektur
-message = client.messages.create(
-    model="claude-3-haiku-20240307",
-    max_tokens=1000,
-    messages=[
-        {"role": "user", "content": f"""
-            Du bist ein Sprachlehrer für Deutsch.
-            
-            🔹 **Deine Aufgabe:**  
-            1️⃣ **Vergleiche den vom Schüler geschriebenen Text mit dem Originaltext.**  
-            2️⃣ **Liste NUR die falsch geschriebenen Wörter und ihre korrekte Schreibweise auf.**
-            3️⃣ **Gib eine Bewertung (0-10 Punkte) und berechne die Prozentzahl der richtig geschriebenen Wörter.**
-            
-            📌 **Originaltext (Lehrerversion):**
-            "{original_text}"
-            
-            📝 **Vom Schüler geschriebener Text:**
-            "{user_text}"
-            
-            Deine Antwort soll folgendes Format haben:
-            
-            **Korrektur:**
-            falsch: [falsches Wort 1] → richtig: [richtiges Wort 1]
-            falsch: [falsches Wort 2] → richtig: [richtiges Wort 2]
-            ...
-            
-            **Bewertung:**
-            [X/10 Punkte]
-            
-            **Prozent korrekt:**
-            [Y%]
-            
-            Außerdem gib am Ende deiner Antwort eine einfache Zeile mit nur der Punktzahl und dem Prozentsatz aus, 
-            die ich programmatisch extrahieren kann. Zum Beispiel: "SCORE:7.5|PERCENT:85"
-        """}
-    ]
-)
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=1000,
+            messages=[
+                {"role": "user", "content": f"""
+                    Du bist ein Sprachlehrer für Deutsch.
+                    
+                    🔹 **Deine Aufgabe:**  
+                    1️⃣ **Vergleiche den vom Schüler geschriebenen Text mit dem Originaltext.**  
+                    2️⃣ **Liste NUR die falsch geschriebenen Wörter und ihre korrekte Schreibweise auf.**
+                    3️⃣ **Gib eine Bewertung (0-10 Punkte) und berechne die Prozentzahl der richtig geschriebenen Wörter.**
+                    
+                    📌 **Originaltext (Lehrerversion):**
+                    "{original_text}"
+                    
+                    📝 **Vom Schüler geschriebener Text:**
+                    "{user_text}"
+                    
+                    Deine Antwort soll folgendes Format haben:
+                    
+                    **Korrektur:**
+                    falsch: [falsches Wort 1] → richtig: [richtiges Wort 1]
+                    falsch: [falsches Wort 2] → richtig: [richtiges Wort 2]
+                    ...
+                    
+                    **Bewertung:**
+                    [X/10 Punkte]
+                    
+                    **Prozent korrekt:**
+                    [Y%]
+                    
+                    Außerdem gib am Ende deiner Antwort eine einfache Zeile mit nur der Punktzahl und dem Prozentsatz aus, 
+                    die ich programmatisch extrahieren kann. Zum Beispiel: "SCORE:7.5|PERCENT:85"
+                """}
+            ]
+        )
         
         result_text = message.content[0].text if isinstance(message.content, list) else message.content
         
