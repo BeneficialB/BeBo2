@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BeBoDiktat - Schüler:innen-Ansicht</title>
+    <title>BeBoDiktat - Schüleransicht</title>
     <style>
         /* Retro-Hintergrundraster (genau wie im BeBo-Korrektur-Tool) */
         body {
             font-family: 'Press Start 2P', monospace; /* Retro-Schrift */
-            padding: 10px;
+            padding: 20px;
             margin: 0;
             background: linear-gradient(to bottom, #111111, #222222); /* Dunkler Verlauf */
             color: #ffffff;
@@ -40,10 +40,10 @@
         .container {
             display: flex;
             background: #333333; /* Dunkler Container */
-            padding: 15px;
+            padding: 20px;
             border-radius: 10px;
-            max-width: 100%;
-            margin: 10px auto;
+            max-width: 1000px;
+            margin: 20px auto;
             box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
             border: 3px solid #ff9900; /* Orange-Rahmen */
         }
@@ -51,7 +51,7 @@
         /* Textbereich */
         .text-section {
             flex: 1;
-            padding-right: 10px;
+            padding-right: 20px;
         }
 
         h1, h2 {
@@ -60,16 +60,16 @@
         }
 
         h1 {
-            font-size: 18px;
+            font-size: 20px;
         }
 
         h2 {
-            font-size: 14px;
-            margin-top: 15px;
+            font-size: 16px;
+            margin-top: 20px;
         }
 
         p {
-            font-size: 12px;
+            font-size: 14px;
             line-height: 1.6;
         }
 
@@ -123,8 +123,8 @@
 
         .audio-controls button {
             flex: 1;
-            font-size: 12px;
-            padding: 10px;
+            font-size: 14px;
+            padding: 15px;
         }
 
         /* Diktat-Navigationsbuttons */
@@ -137,15 +137,13 @@
         .navigation-controls button {
             flex: 1;
             font-size: 12px;
-            padding: 8px;
-            min-width: initial;
-            max-width: 60px;
+            padding: 10px;
         }
 
         /* Diktat-Eingabe */
         #dictation-input {
             min-height: 150px;
-            margin: 15px 0;
+            margin: 20px 0;
         }
 
         /* Ergebnisbereich */
@@ -161,16 +159,15 @@
             font-size: 12px;
             max-height: 300px;
             overflow-y: auto;
-            margin: 15px 0;
+            margin: 20px 0;
         }
 
         /* Link zurück zur Startseite */
         .home-link {
             display: block;
-            margin: 15px 0;
+            margin: 20px 0;
             color: #ffcc00;
             text-decoration: none;
-            font-size: 12px;
         }
 
         .home-link:hover {
@@ -180,11 +177,11 @@
         /* Bildbereich */
         .image-section {
             text-align: center;
-            min-width: 120px;
+            min-width: 200px;
         }
 
         .image-section img {
-            max-width: 120px;
+            max-width: 200px;
             height: auto;
             border: 2px solid #ffcc00;
             border-radius: 10px;
@@ -207,20 +204,20 @@
         .result-summary {
             background: #222222;
             padding: 15px;
-            margin: 15px 0;
+            margin: 20px 0;
             border-radius: 5px;
             border: 2px solid #00ccff;
             text-align: center;
         }
 
         .score {
-            font-size: 20px;
+            font-size: 24px;
             color: #00ccff;
             margin: 10px 0;
         }
 
         .percent {
-            font-size: 20px;
+            font-size: 24px;
             color: #00ccff;
             margin: 10px 0;
         }
@@ -231,41 +228,14 @@
                 flex-direction: column;
                 align-items: center;
                 text-align: center;
-                width: 90%;
             }
 
             .text-section {
                 padding-right: 0;
-                width: 100%;
             }
 
-            .audio-controls {
+            .audio-controls, .navigation-controls {
                 flex-direction: column;
-            }
-            
-            .navigation-controls {
-                display: flex;
-                flex-direction: row;
-                justify-content: center;
-            }
-            
-            .navigation-controls button {
-                flex: 0 1 auto;
-                width: 30%;
-                font-size: 11px;
-                padding: 6px;
-            }
-            
-            .image-section {
-                margin-top: 20px;
-            }
-            
-            body {
-                padding: 5px;
-            }
-            
-            h1 {
-                font-size: 16px;
             }
         }
     </style>
@@ -276,8 +246,8 @@
     <div class="container">
         <!-- Linker Bereich mit Text -->
         <div class="text-section">
-            <h1>BeBoDiktat – Schüler:innen-Ansicht</h1>
-            <p>Gib die Diktat-ID ein, die du von deiner Lehrkraft erhalten hast.</p>
+            <h1>BeBoDiktat – Schüleransicht</h1>
+            <p>Gib die Diktat-ID ein, die du von deinem Lehrer erhalten hast.</p>
             
             <!-- Diktat-ID-Eingabe -->
             <div id="id-input-section">
@@ -299,13 +269,14 @@
                 <!-- Audio-Steuerung - einfache Buttons -->
                 <div class="audio-controls">
                     <button id="play-button">Ganzes Diktat abspielen</button>
+                    <button id="stop-button">Stoppen</button>
                 </div>
                 
                 <!-- Satz-Navigation -->
                 <div class="navigation-controls">
-                    <button id="section1-button">1</button>
-                    <button id="section2-button">2</button>
-                    <button id="section3-button">3</button>
+                    <button id="section1-button">Abschnitt 1</button>
+                    <button id="section2-button">Abschnitt 2</button>
+                    <button id="section3-button">Abschnitt 3</button>
                 </div>
                 
                 <!-- Diktat-Eingabe -->
@@ -349,6 +320,7 @@
         const dictationSection = document.getElementById('dictation-section');
         const dictationTitle = document.getElementById('dictation-title');
         const playButton = document.getElementById('play-button');
+        const stopButton = document.getElementById('stop-button');
         const section1Button = document.getElementById('section1-button');
         const section2Button = document.getElementById('section2-button');
         const section3Button = document.getElementById('section3-button');
@@ -365,50 +337,6 @@
         let dictationSpeed = 1.0;
         let studentName = '';
         let sections = [];
-        
-        // Prüfen ob Sprache unterstützt wird
-        function checkVoiceSupport() {
-            // Prüfen ob ResponsiveVoice verfügbar ist
-            if (typeof responsiveVoice === 'undefined') {
-                return false;
-            }
-            
-            // Prüfen ob Web Speech API verfügbar ist
-            if (!('speechSynthesis' in window)) {
-                return false;
-            }
-            
-            return true;
-        }
-        
-        // Universelle Sprachfunktion mit Fallback
-        function speakText(text, rate) {
-            // Stoppe laufende Sprachausgabe
-            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
-                responsiveVoice.cancel();
-            }
-            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
-            }
-            
-            // Versuche ResponsiveVoice zu nutzen
-            if (typeof responsiveVoice !== 'undefined') {
-                try {
-                    responsiveVoice.speak(text, 'Deutsch Male', { rate: rate });
-                    return;
-                } catch (e) {
-                    console.log("ResponsiveVoice fehlgeschlagen, nutze Web Speech API als Fallback");
-                }
-            }
-            
-            // Fallback zur Web Speech API
-            if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'de-DE';
-                utterance.rate = rate;
-                window.speechSynthesis.speak(utterance);
-            }
-        }
         
         // Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
         function replacePunctuationWithWords(text) {
@@ -485,6 +413,11 @@
         
         // Sprachausgabe vorbereiten
         function prepareUtterance(text, speed) {
+            // Bestehende Sprachausgabe stoppen
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
+            }
+            
             // Text für spätere Verwendung speichern
             window.diktatFullText = text;
             window.diktatSpeed = speed;
@@ -500,43 +433,72 @@
             ];
             
             // Abschnitt-Buttons Beschriftung aktualisieren
-            section1Button.textContent = "1";
-            section2Button.textContent = "2";
-            section3Button.textContent = "3";
+            section1Button.textContent = "Abschnitt 1 (Anfang)";
+            section2Button.textContent = "Abschnitt 2 (Mitte)";
+            section3Button.textContent = "Abschnitt 3 (Ende)";
         }
         
         // Ganzes Diktat abspielen
         playButton.addEventListener('click', function() {
             if (window.diktatFullText) {
+                // Bestehende Sprachausgabe stoppen
+                if (responsiveVoice.isPlaying()) {
+                    responsiveVoice.cancel();
+                }
+                
                 // Text mit ausgesprochenen Satzzeichen vorbereiten
                 const textWithPunctuation = replacePunctuationWithWords(window.diktatFullText);
                 
                 // Text abspielen
-                speakText(textWithPunctuation, window.diktatSpeed);
+                responsiveVoice.speak(textWithPunctuation, 'Deutsch Male', {
+                    rate: window.diktatSpeed
+                });
+            }
+        });
+        
+        // Stoppen-Button
+        stopButton.addEventListener('click', function() {
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
             }
         });
         
         // Abschnitt 1 abspielen
         section1Button.addEventListener('click', function() {
             if (sections.length > 0) {
+                if (responsiveVoice.isPlaying()) {
+                    responsiveVoice.cancel();
+                }
                 const textWithPunctuation = replacePunctuationWithWords(sections[0]);
-                speakText(textWithPunctuation, window.diktatSpeed);
+                responsiveVoice.speak(textWithPunctuation, 'Deutsch Male', {
+                    rate: window.diktatSpeed
+                });
             }
         });
         
         // Abschnitt 2 abspielen
         section2Button.addEventListener('click', function() {
             if (sections.length > 1) {
+                if (responsiveVoice.isPlaying()) {
+                    responsiveVoice.cancel();
+                }
                 const textWithPunctuation = replacePunctuationWithWords(sections[1]);
-                speakText(textWithPunctuation, window.diktatSpeed);
+                responsiveVoice.speak(textWithPunctuation, 'Deutsch Male', {
+                    rate: window.diktatSpeed
+                });
             }
         });
         
         // Abschnitt 3 abspielen
         section3Button.addEventListener('click', function() {
             if (sections.length > 2) {
+                if (responsiveVoice.isPlaying()) {
+                    responsiveVoice.cancel();
+                }
                 const textWithPunctuation = replacePunctuationWithWords(sections[2]);
-                speakText(textWithPunctuation, window.diktatSpeed);
+                responsiveVoice.speak(textWithPunctuation, 'Deutsch Male', {
+                    rate: window.diktatSpeed
+                });
             }
         });
         
@@ -583,11 +545,8 @@
                 resultSection.style.display = 'block';
                 
                 // Audio pausieren
-                if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
+                if (responsiveVoice.isPlaying()) {
                     responsiveVoice.cancel();
-                }
-                if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                    window.speechSynthesis.cancel();
                 }
                 
                 // Button-Status zurücksetzen
@@ -614,13 +573,9 @@
             dictationInput.value = '';
             
             // Audio zurücksetzen
-            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
+            if (responsiveVoice.isPlaying()) {
                 responsiveVoice.cancel();
             }
-            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
-            }
-            
             window.diktatFullText = null;
             currentDictationId = null;
             sections = [];
