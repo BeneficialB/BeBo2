@@ -309,9 +309,7 @@
         const resultPercent = document.getElementById('result-percent');
         const newDictationButton = document.getElementById('new-dictation');
         
-        // Web Speech API
-        const synth = window.speechSynthesis;
-        let utterance = null;
+        // Globale Variablen für das Diktat
         let currentDictationId = null;
         let dictationSpeed = 1.0;
         let studentName = '';
@@ -341,7 +339,7 @@
                 
                 const dictation = await response.json();
                 
-                // Sprachausgabe vorbereiten
+                // Geschwindigkeit speichern
                 dictationSpeed = dictation.speed;
                 currentDictationId = dictationId;
                 
@@ -374,36 +372,35 @@
         // Sprachausgabe vorbereiten
         function prepareUtterance(text, speed) {
             // Bestehende Sprachausgabe stoppen
-            if (synth.speaking) {
-                synth.cancel();
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
             }
             
-            // Neue Sprachausgabe erstellen
-            utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'de-DE';
-            utterance.rate = speed;
+            // Text für spätere Verwendung speichern
+            window.diktatFullText = text;
+            window.diktatSpeed = speed;
         }
         
         // Audio-Steuerung
         playButton.addEventListener('click', function() {
-            if (utterance) {
-                synth.speak(utterance);
+            if (window.diktatFullText) {
+                responsiveVoice.speak(window.diktatFullText, 'Deutsch Female', {rate: window.diktatSpeed});
             }
         });
         
         pauseButton.addEventListener('click', function() {
-            if (synth.speaking) {
-                synth.pause();
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.pause();
             }
         });
         
         restartButton.addEventListener('click', function() {
-            if (synth.speaking) {
-                synth.cancel();
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
             }
             
-            if (utterance) {
-                synth.speak(utterance);
+            if (window.diktatFullText) {
+                responsiveVoice.speak(window.diktatFullText, 'Deutsch Female', {rate: window.diktatSpeed});
             }
         });
         
@@ -450,8 +447,8 @@
                 resultSection.style.display = 'block';
                 
                 // Audio pausieren
-                if (synth.speaking) {
-                    synth.cancel();
+                if (responsiveVoice.isPlaying()) {
+                    responsiveVoice.cancel();
                 }
                 
                 // Button-Status zurücksetzen
@@ -478,12 +475,15 @@
             dictationInput.value = '';
             
             // Audio zurücksetzen
-            if (synth.speaking) {
-                synth.cancel();
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
             }
-            utterance = null;
+            window.diktatFullText = null;
             currentDictationId = null;
         });
-    </script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
+    </script>
+    
+    <!-- ResponsiveVoice Script -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
 </body>
 </html>
