@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeBoDiktat - Lehreransicht</title>
+    <style>
+        /* Retro-Hintergrundraster (genau wie im BeBo-Korrektur-Tool) */
+        body {
+            font-family: 'Press Start 2P', monospace;
+            padding: 20px;
+            margin: 0;
+            background: linear-gradient(to bottom, #111111, #222222);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            animation: scroll-grid 10s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes scroll-grid {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-20px, -20px); }
+        }
+
+        .container {
+            display: flex;
+            background: #333333;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 1000px;
+            margin: 20px auto;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+            border: 3px solid #ff9900;
+        }
+
+        .text-section {
+            flex: 1;
+            padding-right: 20px;
+        }
+
+        h1, h2 {
+            color: #ffcc00;
+            text-shadow: 2px 2px #000000;
+        }
+
+        h1 {
+            font-size: 20px;
+        }
+
+        h2 {
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        select, textarea, input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 2px solid #ff9900;
+            font-family: 'Press Start 2P', monospace;
+            background: #222222;
+            color: #ffcc00;
+        }
+
+        button {
+            background-color: #ff9900;
+            color: #222222;
+            border: none;
+            cursor: pointer;
+            animation: glow 1.5s infinite;
+        }
+
+        button:hover {
+            background-color: #ffcc00;
+        }
+
+        button:disabled {
+            background-color: #666666;
+            animation: none;
+            cursor: not-allowed;
+        }
+
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px #ff9900; }
+            50% { box-shadow: 0 0 20px #ffcc00; }
+            100% { box-shadow: 0 0 5px #ff9900; }
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .speed-control label {
+            margin-right: 10px;
+            min-width: 120px;
+        }
+
+        .speed-control input {
+            flex: 1;
+        }
+
+        .speed-value {
+            min-width: 40px;
+            text-align: center;
+            margin-left: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            background-color: #222222;
+            border: 2px solid #ff9900;
+            cursor: pointer;
+        }
+
+        .tab.active {
+            background-color: #ff9900;
+            color: #222222;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .dictation-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .dictation-item {
+            background: #222222;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 2px solid #ff9900;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .dictation-item:hover {
+            background: #333333;
+            transform: translateX(5px);
+        }
+
+        .dictation-id {
+            font-size: 20px;
+            color: #ffcc00;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .dictation-title {
+            font-weight: bold;
+        }
+
+        .dictation-date {
+            color: #999999;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .delete-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #ff5555;
+            color: white;
+            border: none;
+            width: auto;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 10px;
+            animation: none;
+        }
+
+        .delete-button:hover {
+            background-color: #ff3333;
+        }
+
+        .info-box {
+            background: #222222;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            border: 2px solid #00ccff;
+            text-align: center;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+        }
+
+        .diktat-id {
+            font-size: 24px;
+            color: #00ccff;
+            margin: 10px 0;
+            letter-spacing: 3px;
+        }
+
+        .home-link {
+            display: block;
+            margin: 20px 0;
+            color: #ffcc00;
+            text-decoration: none;
+        }
+
+        .home-link:hover {
+            text-decoration: underline;
+        }
+
+        .image-section {
+            text-align: center;
+            min-width: 200px;
+        }
+
+        .image-section img {
+            max-width: 200px;
+            height: auto;
+            border: 2px solid #ffcc00;
+            border-radius: 10px;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+            animation: wobble 2s infinite;
+            transform-origin: bottom;
+            position: sticky;
+            top: 20px;
+        }
+
+        @keyframes wobble {
+            0% { transform: translateY(0); }
+            25% { transform: translateY(-5px); }
+            50% { transform: translateY(0); }
+            75% { transform: translateY(5px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Ergebnistabelle */
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: #222222;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .results-table th, .results-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #444444;
+        }
+
+        .results-table th {
+            background: #ff9900;
+            color: #222222;
+            cursor: pointer;
+        }
+
+        .results-table th:hover {
+            background: #ffcc00;
+        }
+
+        .results-table tr:hover {
+            background: #333333;
+        }
+
+        .results-table .score-cell {
+            text-align: center;
+        }
+
+        .results-table .percent-cell {
+            text-align: center;
+        }
+
+        .export-button {
+            margin-top: 20px;
+        }
+
+        .logout-button {
+            background-color: #ff5555;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 10px;
+            animation: none;
+        }
+
+        .logout-button:hover {
+            background-color: #ff3333;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+
+            .text-section {
+                padding-right: 0;
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Linker Bereich mit Text -->
+        <div class="text-section">
+            <h1>BeBoDiktat – Lehreransicht</h1>
+            <p>Hier kannst du Diktate erstellen und verwalten sowie die Ergebnisse deiner Schüler einsehen.</p>
+            
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" data-tab="create">Diktat erstellen</div>
+                <div class="tab" data-tab="manage">Diktate verwalten</div>
+                <div class="tab" data-tab="results">Ergebnisse</div>
+            </div>
+            
+            <!-- Tab: Diktat erstellen -->
+            <div id="create-tab" class="tab-content active">
+                <form id="diktat-form">
+                    <label for="title">Titel des Diktats:</label>
+                    <input type="text" id="title" name="title" required placeholder="z.B. Diktat zum Thema Natur">
+
+                    <label for="text">Diktattext eingeben:</label>
+                    <textarea id="text" name="text" rows="8" required placeholder="Gib hier den Text ein, der als Diktat vorgelesen werden soll..."></textarea>
+
+                    <div class="speed-control">
+                        <label for="speed-range">Sprechgeschwindigkeit:</label>
+                        <input type="range" id="speed-range" name="speed" min="0.5" max="2" step="0.1" value="1">
+                        <span id="speed-value" class="speed-value">1.0</span>
+                    </div>
+
+                    <button type="submit" id="create-button">Diktat erstellen</button>
+                </form>
+                
+                <!-- Info-Box für generierte Diktat-ID (anfangs versteckt) -->
+                <div id="dictation-info" class="info-box" style="display: none;">
+                    <p>Dein Diktat wurde erstellt! Teile diese ID mit deinen Schülern:</p>
+                    <div class="diktat-id" id="generated-id">XXXXXX</div>
+                    <p>Schüler können mit dieser ID auf das Diktat zugreifen.</p>
+                </div>
+            </div>
+            
+            <!-- Tab: Diktate verwalten -->
+            <div id="manage-tab" class="tab-content">
+                <h2>Deine erstellten Diktate</h2>
+                <button id="refresh-list">Liste aktualisieren</button>
+                
+                <ul id="dictation-list" class="dictation-list">
+                    <!-- Hier werden die Diktate dynamisch eingetragen -->
+                    <li class="dictation-item">
+                        <span class="dictation-id">Lädt Diktate...</span>
+                    </li>
+                </ul>
+                
+                <!-- Details zu einem ausgewählten Diktat -->
+                <div id="dictation-details" style="display: none;">
+                    <h2>Diktat-Details</h2>
+                    <p><strong>Titel:</strong> <span id="detail-title"></span></p>
+                    <p><strong>ID:</strong> <span id="detail-id"></span></p>
+                    <p><strong>Erstellt am:</strong> <span id="detail-date"></span></p>
+                    <p><strong>Text:</strong></p>
+                    <pre id="detail-text"></pre>
+                    
+                    <button id="test-playback">Vorschau anhören</button>
+                    <button id="back-to-list">Zurück zur Liste</button>
+                </div>
+            </div>
+            
+            <!-- Tab: Ergebnisse -->
+            <div id="results-tab" class="tab-content">
+                <h2>Schülerergebnisse</h2>
+                <button id="refresh-results">Ergebnisse aktualisieren</button>
+                
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="name">Name</th>
+                            <th data-sort="dictation">Diktat</th>
+                            <th data-sort="score" class="score-cell">Punkte</th>
+                            <th data-sort="percent" class="percent-cell">Prozent</th>
+                            <th data-sort="date">Datum</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body">
+                        <!-- Hier werden die Ergebnisse dynamisch eingetragen -->
+                        <tr>
+                            <td colspan="5">Lädt Ergebnisse...</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <button id="export-results" class="export-button">Ergebnisse exportieren (CSV)</button>
+            </div>
+            
+            <!-- Link zurück zur Startseite und Logout -->
+            <div>
+                <a href="/" class="home-link">← Zurück zur Startseite</a>
+                <a href="/lehrer/logout" class="logout-button">Abmelden</a>
+            </div>
+        </div>
+
+        <!-- Rechter Bereich mit Bild -->
+        <div class="image-section">
+            <img src="{{ url_for('static', filename='Bebo.png') }}" alt="BeBo Bot">
+        </div>
+    </div>
+
+    <script>
+        // DOM-Elemente
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const diktatForm = document.getElementById('diktat-form');
+        const speedRange = document.getElementById('speed-range');
+        const speedValue = document.getElementById('speed-value');
+        const dictationInfo = document.getElementById('dictation-info');
+        const generatedId = document.getElementById('generated-id');
+        const refreshListButton = document.getElementById('refresh-list');
+        const dictationList = document.getElementById('dictation-list');
+        const dictationDetails = document.getElementById('dictation-details');
+        const detailTitle = document.getElementById('detail-title');
+        const detailId = document.getElementById('detail-id');
+        const detailDate = document.getElementById('detail-date');
+        const detailText = document.getElementById('detail-text');
+        const testPlaybackButton = document.getElementById('test-playback');
+        const backToListButton = document.getElementById('back-to-list');
+        const refreshResultsButton = document.getElementById('refresh-results');
+        const resultsBody = document.getElementById('results-body');
+        const exportResultsButton = document.getElementById('export-results');
+        
+        // Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
+        function replacePunctuationWithWords(text) {
+            return text
+                .replace(/\./g, ' Punkt ')
+                .replace(/,/g, ' Komma ')
+                .replace(/;/g, ' Semikolon ')
+                .replace(/:/g, ' Doppelpunkt ')
+                .replace(/\?/g, ' Fragezeichen ')
+                .replace(/!/g, ' Ausrufezeichen ')
+                .replace(/\(/g, ' Klammer auf ')
+                .replace(/\)/g, ' Klammer zu ')
+                .replace(/\"/g, ' Anführungszeichen ')
+                .replace(/\'/g, ' Apostroph ')
+                .replace(/-/g, ' Bindestrich ')
+                .replace(/\//g, ' Schrägstrich ');
+        }
+        
+        // Tab-Funktionalität
+        tabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                // Aktiven Tab aktualisieren
+                tabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Tab-Inhalt anzeigen
+                const tabId = this.getAttribute('data-tab');
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    content.style.display = 'none';
+                });
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+                document.getElementById(`${tabId}-tab`).style.display = 'block';
+                
+                // Bei Tabwechsel automatisch aktualisieren
+                if (tabId === 'manage') {
+                    loadDictations();
+                } else if (tabId === 'results') {
+                    loadResults();
+                }
+            });
+        });
+        
+        // Geschwindigkeitsregler
+        speedRange.addEventListener('input', function() {
+            const speed = parseFloat(this.value);
+            speedValue.textContent = speed.toFixed(1);
+        });
+        
+        // Diktat erstellen
+        diktatForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const createButton = document.getElementById('create-button');
+            
+            // Button-Status aktualisieren
+            createButton.textContent = 'Wird erstellt...';
+            createButton.disabled = true;
+            
+            try {
+                const response = await fetch('/create_dictation', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Fehler beim Erstellen des Diktats');
+                }
+                
+                // Diktat-ID anzeigen
+                generatedId.textContent = data.dictation_id;
+                dictationInfo.style.display = 'block';
+                
+                // Formular zurücksetzen
+                diktatForm.reset();
+                
+                // Button-Status zurücksetzen
+                createButton.textContent = 'Diktat erstellen';
+                createButton.disabled = false;
+                
+            } catch (error) {
+                alert(`Fehler: ${error.message}`);
+                createButton.textContent = 'Diktat erstellen';
+                createButton.disabled = false;
+            }
+        });
+        
+        // Diktate laden
+        async function loadDictations() {
+            try {
+                const response = await fetch('/get_dictations');
+                const data = await response.json();
+                
+                // Liste leeren
+                dictationList.innerHTML = '';
+                
+                if (data.length === 0) {
+                    dictationList.innerHTML = '<li class="dictation-item">Keine Diktate vorhanden</li>';
+                    return;
+                }
+                
+                // Diktate anzeigen
+                data.forEach(dictation => {
+                    const li = document.createElement('li');
+                    li.className = 'dictation-item';
+                    li.innerHTML = `
+                        <span class="dictation-id">${dictation.id}</span>
+                        <span class="dictation-title">${dictation.title}</span>
+                        <span class="dictation-date">Erstellt: ${formatDate(dictation.created_at)}</span>
+                        <button class="delete-button" data-id="${dictation.id}">Löschen</button>
+                    `;
+                    
+                    // Klick-Event für Details
+                    li.addEventListener('click', function(e) {
+                        // Verhindern, dass der Klick auf den Löschbutton das Diktat öffnet
+                        if (e.target.classList.contains('delete-button')) {
+                            e.stopPropagation();
+                            return;
+                        }
+                        loadDictationDetails(dictation.id);
+                    });
+                    
+                    dictationList.appendChild(li);
+                });
+                
+                // Event-Listener für Löschbuttons hinzufügen
+                document.querySelectorAll('.delete-button').forEach(button => {
+                    button.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Verhindert, dass der Klick das Diktat öffnet
+                        const dictationId = this.getAttribute('data-id');
+                        if (confirm(`Bist du sicher, dass du das Diktat "${dictationId}" löschen möchtest?`)) {
+                            deleteDictation(dictationId);
+                        }
+                    });
+                });
+                
+            } catch (error) {
+                console.error('Fehler beim Laden der Diktate:', error);
+                dictationList.innerHTML = '<li class="dictation-item">Fehler beim Laden der Diktate</li>';
+            }
+        }
+        
+        // Diktat löschen
+        async function deleteDictation(dictationId) {
+            try {
+                const response = await fetch(`/delete_dictation/${dictationId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Fehler beim Löschen des Diktats');
+                }
+                
+                // Liste aktualisieren
+                loadDictations();
+                
+            } catch (error) {
+                console.error('Fehler beim Löschen des Diktats:', error);
+                alert(`Fehler beim Löschen des Diktats: ${error.message}`);
+            }
+        }
+        
+        // Diktat-Details laden
+        async function loadDictationDetails(dictationId) {
+            try {
+                const response = await fetch(`/get_full_dictation/${dictationId}`);
+                const dictation = await response.json();
+                
+                // Details anzeigen
+                detailTitle.textContent = dictation.title;
+                detailId.textContent = dictation.id;
+                detailDate.textContent = formatDate(dictation.created_at);
+                detailText.textContent = dictation.text;
+                
+                // UI aktualisieren
+                dictationList.style.display = 'none';
+                refreshListButton.style.display = 'none';
+                dictationDetails.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Fehler beim Laden der Diktat-Details:', error);
+                alert('Fehler beim Laden der Diktat-Details');
+            }
+        }
+        
+        // Vorschau abspielen
+        testPlaybackButton.addEventListener('click', function() {
+            const text = detailText.textContent;
+            
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
+            }
+            
+            // Text mit ausgesprochenen Satzzeichen erstellen
+            const textWithSpokenPunctuation = replacePunctuationWithWords(text);
+            
+            responsiveVoice.speak(textWithSpokenPunctuation, 'Deutsch Male', {
+                rate: parseFloat(speedRange.value)
+            });
+        });
+        
+        // Zurück zur Liste
+        backToListButton.addEventListener('click', function() {
+            dictationDetails.style.display = 'none';
+            dictationList.style.display = 'block';
+            refreshListButton.style.display = 'block';
+            
+            // Sprachausgabe stoppen
+            if (responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
+            }
+        });
+        
+        // Ergebnisse laden
+        async function loadResults() {
+            try {
+                const response = await fetch('/get_results');
+                const data = await response.json();
+                
+                // Tabelle leeren
+                resultsBody.innerHTML = '';
+                
+                if (data.length === 0) {
+                    resultsBody.innerHTML = '<tr><td colspan="5">Keine Ergebnisse vorhanden</td></tr>';
+                    return;
+                }
+                
+                // Ergebnisse anzeigen
+                data.forEach(result => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${result.student_name}</td>
+                        <td>${result.dictation_title} (${result.dictation_id})</td>
+                        <td class="score-cell">${result.score.toFixed(1)}/10</td>
+                        <td class="percent-cell">${result.percent.toFixed(1)}%</td>
+                        <td>${formatDate(result.created_at)}</td>
+                    `;
+                    resultsBody.appendChild(tr);
+                });
+                
+            } catch (error) {
+                console.error('Fehler beim Laden der Ergebnisse:', error);
+                resultsBody.innerHTML = '<tr><td colspan="5">Fehler beim Laden der Ergebnisse</td></tr>';
+            }
+        }
+        
+        // Ergebnisse exportieren
+        exportResultsButton.addEventListener('click', async function() {
+            try {
+                const response = await fetch('/get_results');
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    alert('Keine Ergebnisse zum Exportieren vorhanden');
+                    return;
+                }
+                
+                // CSV erstellen
+                let csv = 'Name,Diktat,Diktat-ID,Punkte,Prozent,Datum\n';
+                data.forEach(result => {
+                    csv += `"${result.student_name}","${result.dictation_title}","${result.dictation_id}",${result.score.toFixed(1)},${result.percent.toFixed(1)}%,"${formatDate(result.created_at)}"\n`;
+                });
+                
+                // Download starten
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', `bebodiktat-ergebnisse-${new Date().toISOString().slice(0, 10)}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+            } catch (error) {
+                console.error('Fehler beim Exportieren der Ergebnisse:', error);
+                alert('Fehler beim Exportieren der Ergebnisse');
+            }
+        });
+        
+        // Listen aktualisieren
+        refreshListButton.addEventListener('click', loadDictations);
+        refreshResultsButton.addEventListener('click', loadResults);
+        
+        // Hilfsfunktion: Datum formatieren
+        function formatDate(isoDate) {
+            if (!isoDate) return '';
+            const date = new Date(isoDate);
+            return date.toLocaleString('de-DE');
+        }
+        
+        // Tabellensortierung
+        document.querySelectorAll('.results-table th').forEach(header => {
+            header.addEventListener('click', function() {
+                const sortBy = this.getAttribute('data-sort');
+                sortResults(sortBy);
+            });
+        });
+        
+        // Ergebnisse sortieren
+        function sortResults(sortBy) {
+            const rows = Array.from(resultsBody.querySelectorAll('tr'));
+            
+            if (rows.length <= 1) return;
+            
+            rows.sort((a, b) => {
+                let valA, valB;
+                
+                if (sortBy === 'name') {
+                    valA = a.cells[0].textContent;
+                    valB = b.cells[0].textContent;
+                    return valA.localeCompare(valB);
+                } else if (sortBy === 'dictation') {
+                    valA = a.cells[1].textContent;
+                    valB = b.cells[1].textContent;
+                    return valA.localeCompare(valB);
+                } else if (sortBy === 'score') {
+                    valA = parseFloat(a.cells[2].textContent);
+                    valB = parseFloat(b.cells[2].textContent);
+                    return valB - valA; // Absteigend für Punkte
+                } else if (sortBy === 'percent') {
+                    valA = parseFloat(a.cells[3].textContent);
+                    valB = parseFloat(b.cells[3].textContent);
+                    return valB - valA; // Absteigend für Prozent
+                } else if (sortBy === 'date') {
+                    valA = new Date(a.cells[4].textContent);
+                    valB = new Date(b.cells[4].textContent);
+                    return valB - valA; // Neueste zuerst
+                }
+                
+                return 0;
+            });
+            
+            // Tabelle neu aufbauen
+            rows.forEach(row => resultsBody.appendChild(row));
+        }
+        
+        // Beim Laden der Seite
+        document.addEventListener('DOMContentLoaded', function() {
+            // Standardmäßig den ersten Tab aktivieren
+            document.querySelector('.tab.active').click();
+        });
+    </script>
+    
+    <!-- ResponsiveVoice Script -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
+</body>
+</html>
