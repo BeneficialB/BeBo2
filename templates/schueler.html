@@ -123,6 +123,8 @@
 
         .audio-controls button {
             flex: 1;
+            font-size: 14px;
+            padding: 15px;
         }
 
         /* Diktat-Eingabe */
@@ -251,11 +253,10 @@
             <div id="dictation-section" style="display: none;">
                 <h2 id="dictation-title">Titel des Diktats</h2>
                 
-                <!-- Audio-Steuerung -->
+                <!-- Audio-Steuerung - vereinfacht auf 2 Buttons -->
                 <div class="audio-controls">
                     <button id="play-button">Diktat abspielen</button>
-                    <button id="pause-button">Pause</button>
-                    <button id="restart-button">Neu starten</button>
+                    <button id="restart-button">Von vorne beginnen</button>
                 </div>
                 
                 <!-- Diktat-Eingabe -->
@@ -299,7 +300,6 @@
         const dictationSection = document.getElementById('dictation-section');
         const dictationTitle = document.getElementById('dictation-title');
         const playButton = document.getElementById('play-button');
-        const pauseButton = document.getElementById('pause-button');
         const restartButton = document.getElementById('restart-button');
         const dictationForm = document.getElementById('dictation-form');
         const dictationInput = document.getElementById('dictation-input');
@@ -313,6 +313,7 @@
         let currentDictationId = null;
         let dictationSpeed = 1.0;
         let studentName = '';
+        let isPlaying = false;
         
         // Diktat-ID laden
         idForm.addEventListener('submit', async function(e) {
@@ -381,26 +382,45 @@
             window.diktatSpeed = speed;
         }
         
-        // Audio-Steuerung
+        // Audio-Steuerung - Vereinfacht auf Play/Stop
         playButton.addEventListener('click', function() {
             if (window.diktatFullText) {
-                responsiveVoice.speak(window.diktatFullText, 'Deutsch Male', {rate: window.diktatSpeed});
+                if (responsiveVoice.isPlaying()) {
+                    // Wenn spielt, dann stoppen und Button-Text ändern
+                    responsiveVoice.cancel();
+                    this.textContent = "Diktat abspielen";
+                    isPlaying = false;
+                } else {
+                    // Wenn gestoppt, dann abspielen und Button-Text ändern
+                    responsiveVoice.speak(window.diktatFullText, 'Deutsch Male', {
+                        rate: window.diktatSpeed,
+                        onend: function() {
+                            playButton.textContent = "Diktat abspielen";
+                            isPlaying = false;
+                        }
+                    });
+                    this.textContent = "Diktat stoppen";
+                    isPlaying = true;
+                }
             }
         });
         
-        pauseButton.addEventListener('click', function() {
-            if (responsiveVoice.isPlaying()) {
-                responsiveVoice.pause();
-            }
-        });
-        
+        // Von vorne beginnen Button
         restartButton.addEventListener('click', function() {
             if (responsiveVoice.isPlaying()) {
                 responsiveVoice.cancel();
             }
             
             if (window.diktatFullText) {
-                responsiveVoice.speak(window.diktatFullText, 'Deutsch Male', {rate: window.diktatSpeed});
+                responsiveVoice.speak(window.diktatFullText, 'Deutsch Male', {
+                    rate: window.diktatSpeed,
+                    onend: function() {
+                        playButton.textContent = "Diktat abspielen";
+                        isPlaying = false;
+                    }
+                });
+                playButton.textContent = "Diktat stoppen";
+                isPlaying = true;
             }
         });
         
@@ -480,6 +500,8 @@
             }
             window.diktatFullText = null;
             currentDictationId = null;
+            playButton.textContent = "Diktat abspielen";
+            isPlaying = false;
         });
     </script>
     
