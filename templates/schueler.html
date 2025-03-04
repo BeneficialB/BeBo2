@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeBoDiktat - Schüleransicht</title>
+    <style>
+        /* Retro-Hintergrundraster (genau wie im BeBo-Korrektur-Tool) */
+        body {
+            font-family: 'Press Start 2P', monospace; /* Retro-Schrift */
+            padding: 20px;
+            margin: 0;
+            background: linear-gradient(to bottom, #111111, #222222); /* Dunkler Verlauf */
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scrollendes Raster */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            animation: scroll-grid 10s linear infinite;
+            z-index: -1; /* Hinter dem Inhalt */
+        }
+
+        @keyframes scroll-grid {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-20px, -20px); }
+        }
+
+        /* Hauptcontainer */
+        .container {
+            display: flex;
+            background: #333333; /* Dunkler Container */
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 1000px;
+            margin: 20px auto;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+            border: 3px solid #ff9900; /* Orange-Rahmen */
+        }
+
+        /* Textbereich */
+        .text-section {
+            flex: 1;
+            padding-right: 20px;
+        }
+
+        h1, h2 {
+            color: #ffcc00;
+            text-shadow: 2px 2px #000000; /* Retro-Textschatten */
+        }
+
+        h1 {
+            font-size: 20px;
+        }
+
+        h2 {
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* Formular */
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        input, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 2px solid #ff9900;
+            font-family: 'Press Start 2P', monospace;
+            background: #222222;
+            color: #ffcc00;
+        }
+
+        button {
+            background-color: #ff9900;
+            color: #222222;
+            border: none;
+            cursor: pointer;
+            animation: glow 1.5s infinite; /* Leuchtender Effekt */
+        }
+
+        button:hover {
+            background-color: #ffcc00;
+        }
+
+        button:disabled {
+            background-color: #666666;
+            animation: none;
+            cursor: not-allowed;
+        }
+
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px #ff9900; }
+            50% { box-shadow: 0 0 20px #ffcc00; }
+            100% { box-shadow: 0 0 5px #ff9900; }
+        }
+
+        /* Audio-Player und Kontrollbereich */
+        .audio-controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .audio-controls button {
+            flex: 1;
+        }
+
+        /* Diktat-Eingabe */
+        #dictation-input {
+            min-height: 150px;
+            margin: 20px 0;
+        }
+
+        /* Ergebnisbereich */
+        pre {
+            background: #222222;
+            color: #ffffff;
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid #ff9900;
+            text-align: left;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+
+        /* Link zurück zur Startseite */
+        .home-link {
+            display: block;
+            margin: 20px 0;
+            color: #ffcc00;
+            text-decoration: none;
+        }
+
+        .home-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Bildbereich */
+        .image-section {
+            text-align: center;
+            min-width: 200px;
+        }
+
+        .image-section img {
+            max-width: 200px;
+            height: auto;
+            border: 2px solid #ffcc00;
+            border-radius: 10px;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+            animation: wobble 2s infinite; /* Wippen */
+            transform-origin: bottom; /* Schwenkpunkt unten */
+            position: sticky;
+            top: 20px;
+        }
+
+        @keyframes wobble {
+            0% { transform: translateY(0); }
+            25% { transform: translateY(-5px); }
+            50% { transform: translateY(0); }
+            75% { transform: translateY(5px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Ergebnisanzeige */
+        .result-summary {
+            background: #222222;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            border: 2px solid #00ccff;
+            text-align: center;
+        }
+
+        .score {
+            font-size: 24px;
+            color: #00ccff;
+            margin: 10px 0;
+        }
+
+        .percent {
+            font-size: 24px;
+            color: #00ccff;
+            margin: 10px 0;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+
+            .text-section {
+                padding-right: 0;
+            }
+
+            .audio-controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+    <!-- Google Fonts: Retro-Schriftart -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Linker Bereich mit Text -->
+        <div class="text-section">
+            <h1>BeBoDiktat – Schüleransicht</h1>
+            <p>Gib die Diktat-ID ein, die du von deinem Lehrer erhalten hast.</p>
+            
+            <!-- Diktat-ID-Eingabe -->
+            <div id="id-input-section">
+                <form id="id-form">
+                    <label for="dictation-id">Diktat-ID:</label>
+                    <input type="text" id="dictation-id" placeholder="z.B. ABC123" required>
+                    
+                    <label for="student-name">Dein Name:</label>
+                    <input type="text" id="student-name" placeholder="Dein Name" required>
+                    
+                    <button type="submit">Diktat laden</button>
+                </form>
+            </div>
+            
+            <!-- Diktat-Bereich (anfangs versteckt) -->
+            <div id="dictation-section" style="display: none;">
+                <h2 id="dictation-title">Titel des Diktats</h2>
+                
+                <!-- Audio-Steuerung -->
+                <div class="audio-controls">
+                    <button id="play-button">Diktat abspielen</button>
+                    <button id="pause-button">Pause</button>
+                    <button id="restart-button">Neu starten</button>
+                </div>
+                
+                <!-- Diktat-Eingabe -->
+                <form id="dictation-form">
+                    <label for="dictation-input">Schreibe das gehörte Diktat:</label>
+                    <textarea id="dictation-input" placeholder="Tippe hier, was du hörst..." required></textarea>
+                    <button type="submit">Überprüfen</button>
+                </form>
+            </div>
+            
+            <!-- Ergebnisbereich (anfangs versteckt) -->
+            <div id="result-section" style="display: none;">
+                <h2>Ergebnis der Überprüfung</h2>
+                
+                <div class="result-summary">
+                    <p>Deine Bewertung:</p>
+                    <div class="score" id="result-score">0/10 Punkte</div>
+                    <div class="percent" id="result-percent">0% richtig</div>
+                </div>
+                
+                <pre id="result-text">Hier erscheint das Ergebnis...</pre>
+                <button id="new-dictation">Weiteres Diktat eingeben</button>
+            </div>
+            
+            <!-- Link zurück zur Startseite -->
+            <a href="/" class="home-link">← Zurück zur Startseite</a>
+        </div>
+        
+        <!-- Rechter Bereich mit Bild -->
+        <div class="image-section">
+            <img src="{{ url_for('static', filename='Bebo.png') }}" alt="BeBo Bot">
+        </div>
+    </div>
+    
+    <script>
+        // DOM-Elemente
+        const idForm = document.getElementById('id-form');
+        const dictationIdInput = document.getElementById('dictation-id');
+        const studentNameInput = document.getElementById('student-name');
+        const idInputSection = document.getElementById('id-input-section');
+        const dictationSection = document.getElementById('dictation-section');
+        const dictationTitle = document.getElementById('dictation-title');
+        const playButton = document.getElementById('play-button');
+        const pauseButton = document.getElementById('pause-button');
+        const restartButton = document.getElementById('restart-button');
+        const dictationForm = document.getElementById('dictation-form');
+        const dictationInput = document.getElementById('dictation-input');
+        const resultSection = document.getElementById('result-section');
+        const resultText = document.getElementById('result-text');
+        const resultScore = document.getElementById('result-score');
+        const resultPercent = document.getElementById('result-percent');
+        const newDictationButton = document.getElementById('new-dictation');
+        
+        // Web Speech API
+        const synth = window.speechSynthesis;
+        let utterance = null;
+        let currentDictationId = null;
+        let dictationSpeed = 1.0;
+        let studentName = '';
+        
+        // Diktat-ID laden
+        idForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const dictationId = dictationIdInput.value.trim().toUpperCase();
+            studentName = studentNameInput.value.trim();
+            
+            if (!dictationId) {
+                alert('Bitte gib eine Diktat-ID ein!');
+                return;
+            }
+            
+            if (!studentName) {
+                alert('Bitte gib deinen Namen ein!');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/get_dictation/${dictationId}`);
+                if (!response.ok) {
+                    throw new Error('Diktat nicht gefunden');
+                }
+                
+                const dictation = await response.json();
+                
+                // Sprachausgabe vorbereiten
+                dictationSpeed = dictation.speed;
+                currentDictationId = dictationId;
+                
+                // UI aktualisieren
+                dictationTitle.textContent = dictation.title;
+                
+                // Diktat-Bereich anzeigen
+                idInputSection.style.display = 'none';
+                dictationSection.style.display = 'block';
+                resultSection.style.display = 'none';
+                
+                // Eingabefeld leeren
+                dictationInput.value = '';
+                
+                // Vollständigen Diktattext vom Lehrer-Endpunkt laden
+                const fullDictationResponse = await fetch(`/get_full_dictation/${dictationId}`);
+                if (!fullDictationResponse.ok) {
+                    console.error('Vollständigen Diktattext nicht geladen (nur für Lehrer)');
+                } else {
+                    const fullDictation = await fullDictationResponse.json();
+                    // Sprachausgabe vorbereiten
+                    prepareUtterance(fullDictation.text, dictation.speed);
+                }
+                
+            } catch (error) {
+                alert(`Fehler: ${error.message}. Bitte überprüfe die Diktat-ID.`);
+            }
+        });
+        
+        // Sprachausgabe vorbereiten
+        function prepareUtterance(text, speed) {
+            // Bestehende Sprachausgabe stoppen
+            if (synth.speaking) {
+                synth.cancel();
+            }
+            
+            // Neue Sprachausgabe erstellen
+            utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'de-DE';
+            utterance.rate = speed;
+        }
+        
+        // Audio-Steuerung
+        playButton.addEventListener('click', function() {
+            if (utterance) {
+                synth.speak(utterance);
+            }
+        });
+        
+        pauseButton.addEventListener('click', function() {
+            if (synth.speaking) {
+                synth.pause();
+            }
+        });
+        
+        restartButton.addEventListener('click', function() {
+            if (synth.speaking) {
+                synth.cancel();
+            }
+            
+            if (utterance) {
+                synth.speak(utterance);
+            }
+        });
+        
+        // Diktat überprüfen
+        dictationForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const userText = dictationInput.value.trim();
+            
+            if (!userText) {
+                alert('Bitte gib deinen Text ein!');
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('dictation_id', currentDictationId);
+                formData.append('user_text', userText);
+                formData.append('student_name', studentName);
+                
+                // Button-Status aktualisieren
+                const submitButton = this.querySelector('button[type="submit"]');
+                submitButton.textContent = 'Wird überprüft...';
+                submitButton.disabled = true;
+                
+                const response = await fetch('/check_dictation', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Fehler bei der Überprüfung');
+                }
+                
+                const result = await response.json();
+                
+                // Ergebnis anzeigen
+                resultText.textContent = result.result;
+                resultScore.textContent = `${result.score.toFixed(1)}/10 Punkte`;
+                resultPercent.textContent = `${result.percent.toFixed(1)}% richtig`;
+                
+                // UI-Wechsel
+                dictationSection.style.display = 'none';
+                resultSection.style.display = 'block';
+                
+                // Audio pausieren
+                if (synth.speaking) {
+                    synth.cancel();
+                }
+                
+                // Button-Status zurücksetzen
+                submitButton.textContent = 'Überprüfen';
+                submitButton.disabled = false;
+                
+            } catch (error) {
+                alert(`Fehler: ${error.message}`);
+                const submitButton = this.querySelector('button[type="submit"]');
+                submitButton.textContent = 'Überprüfen';
+                submitButton.disabled = false;
+            }
+        });
+        
+        // Neues Diktat eingeben
+        newDictationButton.addEventListener('click', function() {
+            // Zurück zur ID-Eingabe
+            idInputSection.style.display = 'block';
+            dictationSection.style.display = 'none';
+            resultSection.style.display = 'none';
+            
+            // Felder zurücksetzen
+            dictationIdInput.value = '';
+            dictationInput.value = '';
+            
+            // Audio zurücksetzen
+            if (synth.speaking) {
+                synth.cancel();
+            }
+            utterance = null;
+            currentDictationId = null;
+        });
+    </script>
+</body>
+</html>
