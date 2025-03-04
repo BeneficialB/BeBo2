@@ -468,6 +468,23 @@
         const resultsBody = document.getElementById('results-body');
         const exportResultsButton = document.getElementById('export-results');
         
+        // Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
+        function replacePunctuationWithWords(text) {
+            return text
+                .replace(/\./g, ' Punkt ')
+                .replace(/,/g, ' Komma ')
+                .replace(/;/g, ' Semikolon ')
+                .replace(/:/g, ' Doppelpunkt ')
+                .replace(/\?/g, ' Fragezeichen ')
+                .replace(/!/g, ' Ausrufezeichen ')
+                .replace(/\(/g, ' Klammer auf ')
+                .replace(/\)/g, ' Klammer zu ')
+                .replace(/\"/g, ' Anführungszeichen ')
+                .replace(/\'/g, ' Apostroph ')
+                .replace(/-/g, ' Bindestrich ')
+                .replace(/\//g, ' Schrägstrich ');
+        }
+        
         // Tab-Funktionalität
         tabs.forEach(tab => {
             tab.addEventListener('click', function() {
@@ -648,7 +665,10 @@
                 responsiveVoice.cancel();
             }
             
-            responsiveVoice.speak(text, 'Deutsch Male', {
+            // Text mit ausgesprochenen Satzzeichen erstellen
+            const textWithSpokenPunctuation = replacePunctuationWithWords(text);
+            
+            responsiveVoice.speak(textWithSpokenPunctuation, 'Deutsch Male', {
                 rate: parseFloat(speedRange.value)
             });
         });
