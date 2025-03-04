@@ -327,6 +327,12 @@
             background-color: #ff3333;
         }
 
+        .audio-status {
+            font-size: 10px;
+            color: #aaaaaa;
+            margin-top: 5px;
+        }
+
         @media (max-width: 768px) {
             .container {
                 flex-direction: column;
@@ -403,6 +409,7 @@
                     <pre id="detail-text"></pre>
                     
                     <button id="test-playback">Vorschau anhören</button>
+                    <div id="audio-status" class="audio-status"></div>
                     <button id="back-to-list">Zurück zur Liste</button>
                 </div>
             </div>
@@ -446,6 +453,55 @@
         </div>
     </div>
 
+    <!-- ResponsiveVoice Script with full permissions -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
+    <script>
+        // Initialize ResponsiveVoice as soon as possible
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof responsiveVoice !== 'undefined') {
+                // Force initialization and check if browser supports voice
+                if (!responsiveVoice.isInitialised()) {
+                    responsiveVoice.init();
+                }
+                
+                // Check available voices for debugging
+                console.log("ResponsiveVoice initialized: ", responsiveVoice.isInitialised());
+                if (responsiveVoice.getVoices) {
+                    console.log("Available voices: ", responsiveVoice.getVoices());
+                }
+                
+                // Force user interaction with audio on page load for mobile browsers
+                const unlockAudio = () => {
+                    console.log("Unlocking audio context for mobile...");
+                    // Create a silent audio context
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    gainNode.gain.value = 0; // Silent
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    oscillator.start(0);
+                    oscillator.stop(0.1);
+                    
+                    // Also attempt to unlock ResponsiveVoice directly
+                    if (responsiveVoice.clickEvent) {
+                        responsiveVoice.clickEvent();
+                    }
+                    
+                    // Remove event listeners after first interaction
+                    document.removeEventListener('click', unlockAudio);
+                    document.removeEventListener('touchstart', unlockAudio);
+                };
+                
+                // Add event listeners to unlock audio on first interaction
+                document.addEventListener('click', unlockAudio);
+                document.addEventListener('touchstart', unlockAudio);
+            } else {
+                console.error("ResponsiveVoice failed to load");
+            }
+        });
+    </script>
+    
     <script>
         // DOM-Elemente
         const tabs = document.querySelectorAll('.tab');
@@ -463,10 +519,126 @@
         const detailDate = document.getElementById('detail-date');
         const detailText = document.getElementById('detail-text');
         const testPlaybackButton = document.getElementById('test-playback');
+        const audioStatus = document.getElementById('audio-status');
         const backToListButton = document.getElementById('back-to-list');
         const refreshResultsButton = document.getElementById('refresh-results');
         const resultsBody = document.getElementById('results-body');
         const exportResultsButton = document.getElementById('export-results');
+        
+        // Universelle Sprachfunktion mit Fallback und Mobile-Unterstützung
+        function speakText(text, rate) {
+            // Stoppe laufende Sprachausgabe
+            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
+            }
+            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+            }
+            
+            // Prüfe auf Mobile-Geräte
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log("Device detection - Mobile:", isMobile);
+            
+            // Versuche ResponsiveVoice zu nutzen
+            if (typeof responsiveVoice !== 'undefined') {
+                try {
+                    // Stelle sicher, dass ResponsiveVoice initialisiert ist
+                    if (!responsiveVoice.isInitialised()) {
+                        console.log("ResponsiveVoice is not initialized, initializing now...");
+                        responsiveVoice.init();
+                    }
+                    
+                    // Status aktualisieren, wenn verfügbar
+                    if (audioStatus) {
+                        audioStatus.textContent = "Sprachausgabe wird gestartet...";
+                    }
+                    
+                    // Verzögerung für Mobile-Geräte hinzufügen, um Browserbeschränkungen zu umgehen
+                    if (isMobile) {
+                        console.log("Using mobile-specific speech settings");
+                        // Auf Mobilgeräten mit einer kleinen Verzögerung abspielen
+                        setTimeout(() => {
+                            responsiveVoice.speak(text, 'Deutsch Male', { 
+                                rate: rate,
+                                pitch: 1,
+                                volume: 1,
+                                onstart: () => {
+                                    console.log("Speech started");
+                                    if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft...";
+                                },
+                                onend: () => {
+                                    console.log("Speech ended");
+                                    if (audioStatus) audioStatus.textContent = "Sprachausgabe beendet.";
+                                },
+                                onerror: (e) => {
+                                    console.error("Speech error:", e);
+                                    if (audioStatus) audioStatus.textContent = "Fehler bei der Sprachausgabe: " + e;
+                                }
+                            });
+                        }, 100);
+                    } else {
+                        // Auf Desktop-Geräten direkt abspielen
+                        responsiveVoice.speak(text, 'Deutsch Male', { 
+                            rate: rate,
+                            pitch: 1,
+                            volume: 1,
+                            onstart: () => {
+                                console.log("Speech started");
+                                if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft...";
+                            },
+                            onend: () => {
+                                console.log("Speech ended");
+                                if (audioStatus) audioStatus.textContent = "Sprachausgabe beendet.";
+                            },
+                            onerror: (e) => {
+                                console.error("Speech error:", e);
+                                if (audioStatus) audioStatus.textContent = "Fehler bei der Sprachausgabe: " + e;
+                            }
+                        });
+                    }
+                    return;
+                } catch (e) {
+                    console.error("ResponsiveVoice fehlgeschlagen:", e);
+                    console.log("Nutze Web Speech API als Fallback");
+                    if (audioStatus) audioStatus.textContent = "Fehler mit ResponsiveVoice, versuche Alternative...";
+                }
+            } else {
+                console.error("ResponsiveVoice ist nicht verfügbar");
+                if (audioStatus) audioStatus.textContent = "ResponsiveVoice nicht verfügbar!";
+            }
+            
+            // Fallback zur Web Speech API
+            if ('speechSynthesis' in window) {
+                console.log("Using Web Speech API fallback");
+                try {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'de-DE';
+                    utterance.rate = rate;
+                    utterance.volume = 1;
+                    utterance.onstart = () => {
+                        console.log("WebSpeech started");
+                        if (audioStatus) audioStatus.textContent = "Web Speech läuft...";
+                    };
+                    utterance.onend = () => {
+                        console.log("WebSpeech ended");
+                        if (audioStatus) audioStatus.textContent = "Web Speech beendet.";
+                    };
+                    utterance.onerror = (e) => {
+                        console.error("WebSpeech error:", e);
+                        if (audioStatus) audioStatus.textContent = "Fehler mit Web Speech: " + e;
+                    };
+                    
+                    window.speechSynthesis.speak(utterance);
+                } catch (e) {
+                    console.error("Web Speech API fehlgeschlagen:", e);
+                    if (audioStatus) audioStatus.textContent = "Alle Sprachmethoden fehlgeschlagen!";
+                }
+            } else {
+                console.error("Keine Sprachausgabe verfügbar");
+                if (audioStatus) audioStatus.textContent = "Keine Sprachausgabe verfügbar!";
+                alert("Dein Browser unterstützt keine Sprachausgabe. Bitte verwende einen modernen Browser wie Chrome oder Firefox.");
+            }
+        }
         
         // Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
         function replacePunctuationWithWords(text) {
@@ -653,6 +825,9 @@
                 refreshListButton.style.display = 'none';
                 dictationDetails.style.display = 'block';
                 
+                // Status zurücksetzen
+                if (audioStatus) audioStatus.textContent = "";
+                
             } catch (error) {
                 console.error('Fehler beim Laden der Diktat-Details:', error);
                 alert('Fehler beim Laden der Diktat-Details');
@@ -670,9 +845,8 @@
             // Text mit ausgesprochenen Satzzeichen erstellen
             const textWithSpokenPunctuation = replacePunctuationWithWords(text);
             
-            responsiveVoice.speak(textWithSpokenPunctuation, 'Deutsch Male', {
-                rate: parseFloat(speedRange.value)
-            });
+            // Sprachausgabe starten
+            speakText(textWithSpokenPunctuation, parseFloat(speedRange.value));
         });
         
         // Zurück zur Liste
@@ -817,8 +991,5 @@
             document.querySelector('.tab.active').click();
         });
     </script>
-    
-    <!-- ResponsiveVoice Script -->
-    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
 </body>
 </html>
