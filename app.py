@@ -143,6 +143,9 @@ def delete_dictation(dictation_id):
 @app.route("/get_dictation/<dictation_id>")
 def get_dictation(dictation_id):
     """Gibt Informationen zu einem Diktat zurück, ohne den Originaltext."""
+    # Log the received ID (helpful for debugging)
+    print(f"Received dictation_id: {dictation_id}")
+    
     if dictation_id not in dictations:
         return jsonify({"error": "Diktat nicht gefunden."}), 404
     
@@ -171,6 +174,9 @@ def get_dictations():
 @teacher_login_required
 def get_full_dictation(dictation_id):
     """Gibt vollständige Informationen zu einem Diktat zurück, einschließlich Text (nur für Lehreransicht)."""
+    # Log the received ID (helpful for debugging)
+    print(f"Received full dictation_id: {dictation_id}")
+    
     if dictation_id not in dictations:
         return jsonify({"error": "Diktat nicht gefunden."}), 404
     
