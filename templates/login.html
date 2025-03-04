@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BeBoDiktat - Lehreranmeldung</title>
+    <title>BeBoDiktat - Lehrpersonen-Login</title>
     <style>
         /* Retro-Hintergrundraster (genau wie im BeBo-Korrektur-Tool) */
         body {
@@ -145,6 +145,7 @@
                 flex-direction: column;
                 align-items: center;
                 text-align: center;
+                width: 90%;
             }
 
             .text-section {
@@ -158,8 +159,8 @@
     <div class="container">
         <!-- Linker Bereich mit Text -->
         <div class="text-section">
-            <h1>BeBoDiktat – Lehreranmeldung</h1>
-            <p>Gib das Passwort ein, um auf den Lehrerbereich zuzugreifen.</p>
+            <h1>BeBoDiktat – Lehrpersonen-Login</h1>
+            <p>Bitte gib dein Passwort ein, um Diktate zu erstellen und zu bearbeiten.</p>
             
             {% if error %}
             <div class="error-message">
@@ -172,7 +173,7 @@
                 <button type="submit">Anmelden</button>
             </form>
             
-            <a href="/" class="home-link">← Zurück zur Startseite</a>
+            <a href="/" class="home-link">← Zurück zum Start</a>
         </div>
 
         <!-- Rechter Bereich mit Bild -->
