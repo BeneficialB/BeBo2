@@ -127,21 +127,6 @@
             padding: 10px;
         }
 
-        /* Diktat-Navigationsbuttons */
-        .navigation-controls {
-            display: flex;
-            gap: 10px;
-            margin: 10px 0;
-        }
-
-        .navigation-controls button {
-            flex: 1;
-            font-size: 12px;
-            padding: 8px;
-            min-width: initial;
-            max-width: 60px;
-        }
-
         /* Diktat-Eingabe */
         #dictation-input {
             min-height: 150px;
@@ -225,6 +210,13 @@
             margin: 10px 0;
         }
 
+        /* Audio-Status */
+        .audio-status {
+            font-size: 10px;
+            color: #aaaaaa;
+            margin-top: 5px;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .container {
@@ -241,19 +233,6 @@
 
             .audio-controls {
                 flex-direction: column;
-            }
-            
-            .navigation-controls {
-                display: flex;
-                flex-direction: row;
-                justify-content: center;
-            }
-            
-            .navigation-controls button {
-                flex: 0 1 auto;
-                width: 30%;
-                font-size: 11px;
-                padding: 6px;
             }
             
             .image-section {
@@ -298,14 +277,13 @@
                 
                 <!-- Audio-Steuerung - einfache Buttons -->
                 <div class="audio-controls">
-                    <button id="play-button">Ganzes Diktat abspielen</button>
+                    <button id="play-button">Diktat abspielen</button>
                 </div>
                 
-                <!-- Satz-Navigation -->
-                <div class="navigation-controls">
-                    <button id="section1-button">1</button>
-                    <button id="section2-button">2</button>
-                    <button id="section3-button">3</button>
+                <!-- Audio-Test-Button für Mobilgeräte-Debugging -->
+                <div class="audio-test" style="margin: 10px 0;">
+                    <button id="test-audio-button" type="button">Audio-Test</button>
+                    <div id="audio-status" class="audio-status"></div>
                 </div>
                 
                 <!-- Diktat-Eingabe -->
@@ -340,6 +318,55 @@
         </div>
     </div>
     
+    <!-- ResponsiveVoice Script with full permissions -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
+    <script>
+        // Initialize ResponsiveVoice as soon as possible
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof responsiveVoice !== 'undefined') {
+                // Force initialization and check if browser supports voice
+                if (!responsiveVoice.isInitialised()) {
+                    responsiveVoice.init();
+                }
+                
+                // Check available voices for debugging
+                console.log("ResponsiveVoice initialized: ", responsiveVoice.isInitialised());
+                if (responsiveVoice.getVoices) {
+                    console.log("Available voices: ", responsiveVoice.getVoices());
+                }
+                
+                // Force user interaction with audio on page load for mobile browsers
+                const unlockAudio = () => {
+                    console.log("Unlocking audio context for mobile...");
+                    // Create a silent audio context
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    gainNode.gain.value = 0; // Silent
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    oscillator.start(0);
+                    oscillator.stop(0.1);
+                    
+                    // Also attempt to unlock ResponsiveVoice directly
+                    if (responsiveVoice.clickEvent) {
+                        responsiveVoice.clickEvent();
+                    }
+                    
+                    // Remove event listeners after first interaction
+                    document.removeEventListener('click', unlockAudio);
+                    document.removeEventListener('touchstart', unlockAudio);
+                };
+                
+                // Add event listeners to unlock audio on first interaction
+                document.addEventListener('click', unlockAudio);
+                document.addEventListener('touchstart', unlockAudio);
+            } else {
+                console.error("ResponsiveVoice failed to load");
+            }
+        });
+    </script>
+    
     <script>
         // DOM-Elemente
         const idForm = document.getElementById('id-form');
@@ -349,9 +376,6 @@
         const dictationSection = document.getElementById('dictation-section');
         const dictationTitle = document.getElementById('dictation-title');
         const playButton = document.getElementById('play-button');
-        const section1Button = document.getElementById('section1-button');
-        const section2Button = document.getElementById('section2-button');
-        const section3Button = document.getElementById('section3-button');
         const dictationForm = document.getElementById('dictation-form');
         const dictationInput = document.getElementById('dictation-input');
         const resultSection = document.getElementById('result-section');
@@ -359,29 +383,15 @@
         const resultScore = document.getElementById('result-score');
         const resultPercent = document.getElementById('result-percent');
         const newDictationButton = document.getElementById('new-dictation');
+        const testAudioButton = document.getElementById('test-audio-button');
+        const audioStatus = document.getElementById('audio-status');
         
         // Globale Variablen für das Diktat
         let currentDictationId = null;
         let dictationSpeed = 1.0;
         let studentName = '';
-        let sections = [];
         
-        // Prüfen ob Sprache unterstützt wird
-        function checkVoiceSupport() {
-            // Prüfen ob ResponsiveVoice verfügbar ist
-            if (typeof responsiveVoice === 'undefined') {
-                return false;
-            }
-            
-            // Prüfen ob Web Speech API verfügbar ist
-            if (!('speechSynthesis' in window)) {
-                return false;
-            }
-            
-            return true;
-        }
-        
-        // Universelle Sprachfunktion mit Fallback
+        // Universelle Sprachfunktion mit Fallback und Mobile-Unterstützung
         function speakText(text, rate) {
             // Stoppe laufende Sprachausgabe
             if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
@@ -391,22 +401,72 @@
                 window.speechSynthesis.cancel();
             }
             
+            // Prüfe auf Mobile-Geräte
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log("Device detection - Mobile:", isMobile);
+            
             // Versuche ResponsiveVoice zu nutzen
             if (typeof responsiveVoice !== 'undefined') {
                 try {
-                    responsiveVoice.speak(text, 'Deutsch Male', { rate: rate });
+                    // Stelle sicher, dass ResponsiveVoice initialisiert ist
+                    if (!responsiveVoice.isInitialised()) {
+                        console.log("ResponsiveVoice is not initialized, initializing now...");
+                        responsiveVoice.init();
+                    }
+                    
+                    // Verzögerung für Mobile-Geräte hinzufügen, um Browserbeschränkungen zu umgehen
+                    if (isMobile) {
+                        console.log("Using mobile-specific speech settings");
+                        // Auf Mobilgeräten mit einer kleinen Verzögerung abspielen
+                        setTimeout(() => {
+                            responsiveVoice.speak(text, 'Deutsch Male', { 
+                                rate: rate,
+                                pitch: 1,
+                                volume: 1,
+                                onstart: () => console.log("Speech started"),
+                                onend: () => console.log("Speech ended"),
+                                onerror: (e) => console.error("Speech error:", e)
+                            });
+                        }, 100);
+                    } else {
+                        // Auf Desktop-Geräten direkt abspielen
+                        responsiveVoice.speak(text, 'Deutsch Male', { 
+                            rate: rate,
+                            pitch: 1,
+                            volume: 1,
+                            onstart: () => console.log("Speech started"),
+                            onend: () => console.log("Speech ended"),
+                            onerror: (e) => console.error("Speech error:", e)
+                        });
+                    }
                     return;
                 } catch (e) {
-                    console.log("ResponsiveVoice fehlgeschlagen, nutze Web Speech API als Fallback");
+                    console.error("ResponsiveVoice fehlgeschlagen:", e);
+                    console.log("Nutze Web Speech API als Fallback");
                 }
+            } else {
+                console.error("ResponsiveVoice ist nicht verfügbar");
             }
             
             // Fallback zur Web Speech API
             if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'de-DE';
-                utterance.rate = rate;
-                window.speechSynthesis.speak(utterance);
+                console.log("Using Web Speech API fallback");
+                try {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'de-DE';
+                    utterance.rate = rate;
+                    utterance.volume = 1;
+                    utterance.onstart = () => console.log("WebSpeech started");
+                    utterance.onend = () => console.log("WebSpeech ended");
+                    utterance.onerror = (e) => console.error("WebSpeech error:", e);
+                    
+                    window.speechSynthesis.speak(utterance);
+                } catch (e) {
+                    console.error("Web Speech API fehlgeschlagen:", e);
+                }
+            } else {
+                console.error("Keine Sprachausgabe verfügbar");
+                alert("Dein Browser unterstützt keine Sprachausgabe. Bitte verwende einen modernen Browser wie Chrome oder Firefox.");
             }
         }
         
@@ -478,7 +538,7 @@
                     } else {
                         const fullDictation = await fullDictationResponse.json();
                         // Sprachausgabe vorbereiten
-                        prepareUtterance(fullDictation.text, dictation.speed);
+                        prepareDictation(fullDictation.text, dictation.speed);
                     }
                 } catch (err) {
                     console.error('Fehler beim Laden des vollständigen Textes:', err);
@@ -490,60 +550,68 @@
             }
         });
         
-        // Sprachausgabe vorbereiten
-        function prepareUtterance(text, speed) {
+        // Sprachausgabe vorbereiten - vereinfachte Version ohne Abschnitte
+        function prepareDictation(text, speed) {
             // Text für spätere Verwendung speichern
             window.diktatFullText = text;
             window.diktatSpeed = speed;
             
-            // Text in 3 etwa gleich große Abschnitte teilen
-            const words = text.split(/\s+/);
-            const sectionSize = Math.ceil(words.length / 3);
-            
-            sections = [
-                words.slice(0, sectionSize).join(' '),
-                words.slice(sectionSize, sectionSize * 2).join(' '),
-                words.slice(sectionSize * 2).join(' ')
-            ];
-            
-            // Abschnitt-Buttons Beschriftung aktualisieren
-            section1Button.textContent = "1";
-            section2Button.textContent = "2";
-            section3Button.textContent = "3";
+            console.log("Diktat prepared, text length:", text.length);
         }
         
-        // Ganzes Diktat abspielen
+        // Diktat abspielen
         playButton.addEventListener('click', function() {
             if (window.diktatFullText) {
+                // Status aktualisieren
+                audioStatus.textContent = "Sprachausgabe wird gestartet...";
+                
                 // Text mit ausgesprochenen Satzzeichen vorbereiten
                 const textWithPunctuation = replacePunctuationWithWords(window.diktatFullText);
                 
                 // Text abspielen
                 speakText(textWithPunctuation, window.diktatSpeed);
+                
+                // Status aktualisieren
+                audioStatus.textContent = "Diktat wird vorgelesen...";
+            } else {
+                audioStatus.textContent = "Fehler: Kein Diktattext verfügbar.";
             }
         });
         
-        // Abschnitt 1 abspielen
-        section1Button.addEventListener('click', function() {
-            if (sections.length > 0) {
-                const textWithPunctuation = replacePunctuationWithWords(sections[0]);
-                speakText(textWithPunctuation, window.diktatSpeed);
-            }
-        });
-        
-        // Abschnitt 2 abspielen
-        section2Button.addEventListener('click', function() {
-            if (sections.length > 1) {
-                const textWithPunctuation = replacePunctuationWithWords(sections[1]);
-                speakText(textWithPunctuation, window.diktatSpeed);
-            }
-        });
-        
-        // Abschnitt 3 abspielen
-        section3Button.addEventListener('click', function() {
-            if (sections.length > 2) {
-                const textWithPunctuation = replacePunctuationWithWords(sections[2]);
-                speakText(textWithPunctuation, window.diktatSpeed);
+        // Audio-Test-Button
+        testAudioButton.addEventListener('click', function() {
+            audioStatus.textContent = "Test gestartet...";
+            
+            // Einfachen Testtext abspielen
+            const testText = "Dies ist ein Audio-Test. Wenn du diese Nachricht hörst, funktioniert die Sprachausgabe.";
+            
+            try {
+                // Status aktualisieren
+                audioStatus.textContent = "Sprachausgabe wird gestartet...";
+                
+                // Sprachausgabe mit Callbacks
+                if (typeof responsiveVoice !== 'undefined') {
+                    responsiveVoice.speak(testText, 'Deutsch Male', {
+                        onstart: function() {
+                            audioStatus.textContent = "Sprachausgabe läuft...";
+                            console.log("Test speech started");
+                        },
+                        onend: function() {
+                            audioStatus.textContent = "Sprachausgabe erfolgreich abgeschlossen.";
+                            console.log("Test speech completed");
+                        },
+                        onerror: function(e) {
+                            audioStatus.textContent = "Fehler bei der Sprachausgabe: " + e;
+                            console.error("Test speech error:", e);
+                        }
+                    });
+                } else {
+                    audioStatus.textContent = "ResponsiveVoice nicht verfügbar!";
+                    console.error("ResponsiveVoice not available for test");
+                }
+            } catch (e) {
+                audioStatus.textContent = "Fehler: " + e.message;
+                console.error("Test audio error:", e);
             }
         });
         
@@ -630,11 +698,10 @@
             
             window.diktatFullText = null;
             currentDictationId = null;
-            sections = [];
+            
+            // Status zurücksetzen
+            audioStatus.textContent = "";
         });
     </script>
-    
-    <!-- ResponsiveVoice Script -->
-    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
 </body>
 </html>
