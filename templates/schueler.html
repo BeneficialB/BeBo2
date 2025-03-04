@@ -237,6 +237,18 @@
             display: none;
         }
 
+        /* Status-Nachricht */
+        .status-message {
+            background: #55aa55;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 12px;
+            display: none;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .container {
@@ -293,6 +305,9 @@
             
             <!-- Fehlermeldung (anfangs versteckt) -->
             <div id="error-message" class="error-message"></div>
+            
+            <!-- Statusmeldung (anfangs versteckt) -->
+            <div id="status-message" class="status-message"></div>
             
             <!-- Diktat-ID-Eingabe -->
             <div id="id-input-section">
@@ -356,6 +371,9 @@
     </div>
     
     <script>
+        // DEBUG: Browser-Info
+        console.log("BeBoDiktat Schüleransicht geladen. Browser: " + navigator.userAgent);
+        
         // DOM-Elemente
         const idForm = document.getElementById('id-form');
         const dictationIdInput = document.getElementById('dictation-id');
@@ -375,6 +393,7 @@
         const resultPercent = document.getElementById('result-percent');
         const newDictationButton = document.getElementById('new-dictation');
         const errorMessage = document.getElementById('error-message');
+        const statusMessage = document.getElementById('status-message');
         
         // Globale Variablen für das Diktat
         let currentDictationId = null;
@@ -389,6 +408,15 @@
             setTimeout(() => {
                 errorMessage.style.display = 'none';
             }, 5000); // Fehlermeldung nach 5 Sekunden ausblenden
+        }
+        
+        // Funktion zum Anzeigen von Statusmeldungen
+        function showStatus(message) {
+            statusMessage.textContent = message;
+            statusMessage.style.display = 'block';
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 3000); // Statusmeldung nach 3 Sekunden ausblenden
         }
         
         // Prüfen ob Sprache unterstützt wird
@@ -419,6 +447,7 @@
             // Versuche ResponsiveVoice zu nutzen
             if (typeof responsiveVoice !== 'undefined') {
                 try {
+                    showStatus("Spiele Audio...");
                     responsiveVoice.speak(text, 'Deutsch Male', { rate: rate });
                     return;
                 } catch (e) {
@@ -431,6 +460,7 @@
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'de-DE';
                 utterance.rate = rate;
+                showStatus("Spiele Audio (Fallback)...");
                 window.speechSynthesis.speak(utterance);
             } else {
                 showError("Dein Browser unterstützt keine Sprachausgabe. Bitte versuche einen anderen Browser.");
@@ -481,6 +511,8 @@
             }
             
             try {
+                showStatus("Lade Diktat...");
+                
                 const response = await fetch(`/get_dictation/${dictationId}`);
                 
                 if (!response.ok) {
@@ -508,19 +540,35 @@
                 // Eingabefeld leeren
                 dictationInput.value = '';
                 
-                // Vollständigen Diktattext vom Lehrer-Endpunkt laden
+                // Erstelle einen einfachen Fallback-Text, falls wir den Originaltext nicht bekommen
+                // Dieser wird nur verwendet, wenn der tatsächliche Text nicht geladen werden kann
+                const fallbackText = `Diktat "${dictation.title}" mit ID ${dictationId}. Bitte drücke auf 'Ganzes Diktat abspielen'.`;
+                prepareUtterance(fallbackText, dictation.speed);
+                
+                // Versuche den vollständigen Text zu laden
                 try {
                     const fullDictationResponse = await fetch(`/get_full_dictation/${dictationId}`);
                     if (fullDictationResponse.ok) {
                         const fullDictation = await fullDictationResponse.json();
-                        // Sprachausgabe vorbereiten
-                        prepareUtterance(fullDictation.text, dictation.speed);
+                        // Sprachausgabe mit dem echten Text vorbereiten
+                        if (fullDictation && fullDictation.text) {
+                            console.log("Vollständiger Diktattext geladen, Länge:", fullDictation.text.length);
+                            prepareUtterance(fullDictation.text, dictation.speed);
+                            showStatus("Diktat bereit!");
+                        } else {
+                            console.log("Vollständiger Diktattext geladen, aber kein Text gefunden");
+                            showStatus("Diktat teilweise geladen");
+                            reloadDictationText(dictationId, null); // Probiere einen alternativen Lademechanismus
+                        }
                     } else {
                         console.log('Vollständigen Diktattext nicht geladen (nur für Lehrpersonen verfügbar)');
+                        showStatus("Diktat teilweise geladen");
+                        reloadDictationText(dictationId, null); // Probiere einen alternativen Lademechanismus
                     }
                 } catch (error) {
                     console.log('Fehler beim Laden des vollständigen Diktattexts:', error);
-                    // Diese Fehler nicht dem Benutzer anzeigen, da der Endpunkt nur für Lehrer verfügbar ist
+                    showStatus("Diktat teilweise geladen");
+                    reloadDictationText(dictationId, null); // Probiere einen alternativen Lademechanismus
                 }
                 
             } catch (error) {
@@ -530,66 +578,180 @@
         
         // Sprachausgabe vorbereiten
         function prepareUtterance(text, speed) {
-            // Text für spätere Verwendung speichern
-            window.diktatFullText = text;
-            window.diktatSpeed = speed;
+            try {
+                // Text für spätere Verwendung speichern
+                window.diktatFullText = text || "";
+                window.diktatSpeed = speed || 1.0;
+                
+                console.log("Diktattext geladen:", text ? text.length + " Zeichen" : "kein Text");
+                
+                // Leere Prüfung
+                if (!text || text.trim() === "") {
+                    console.error("Leerer Diktattext empfangen");
+                    showError("Leerer Diktattext empfangen. Bitte versuche ein anderes Diktat.");
+                    return;
+                }
+                
+                // Text in 3 etwa gleich große Abschnitte teilen
+                const words = text.split(/\s+/);
+                const sectionSize = Math.ceil(words.length / 3);
+                
+                sections = [
+                    words.slice(0, sectionSize).join(' '),
+                    words.slice(sectionSize, sectionSize * 2).join(' '),
+                    words.slice(sectionSize * 2).join(' ')
+                ];
+                
+                console.log("Diktat in Abschnitte geteilt:", sections.length);
+                
+                // Abschnitt-Buttons Beschriftung aktualisieren
+                section1Button.textContent = "1";
+                section2Button.textContent = "2";
+                section3Button.textContent = "3";
+            } catch (error) {
+                console.error("Fehler beim Vorbereiten der Sprachausgabe:", error);
+                showError("Fehler beim Vorbereiten des Diktats. Bitte versuche es erneut.");
+                
+                // Fallback: Leere Abschnitte erstellen
+                sections = ["", "", ""];
+            }
+        }
+        
+        // Funktion zum erneuten Laden des Diktattextes
+        function reloadDictationText(dictationId, callback) {
+            if (!dictationId) {
+                showError("Keine Diktat-ID gefunden. Bitte lade das Diktat neu.");
+                return;
+            }
             
-            // Text in 3 etwa gleich große Abschnitte teilen
-            const words = text.split(/\s+/);
-            const sectionSize = Math.ceil(words.length / 3);
+            console.log("Versuche Diktattext erneut zu laden für ID:", dictationId);
             
-            sections = [
-                words.slice(0, sectionSize).join(' '),
-                words.slice(sectionSize, sectionSize * 2).join(' '),
-                words.slice(sectionSize * 2).join(' ')
-            ];
-            
-            // Abschnitt-Buttons Beschriftung aktualisieren
-            section1Button.textContent = "1";
-            section2Button.textContent = "2";
-            section3Button.textContent = "3";
+            // Versuche den Diktattext erneut zu laden
+            fetch(`/get_dictation/${dictationId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Diktat nicht gefunden.");
+                    }
+                    return response.json();
+                })
+                .then(dictation => {
+                    // Versuche den vollständigen Text zu laden
+                    return fetch(`/get_full_dictation/${dictationId}`)
+                        .then(fullResponse => {
+                            if (!fullResponse.ok) {
+                                // Plan B: Verwende direkt das Laden für Schüler
+                                console.log("Vollständigen Text nicht laden können, verwende Fallback");
+                                return { text: `Diktat "${dictation.title}". Bitte hör genau zu.` };
+                            }
+                            return fullResponse.json();
+                        })
+                        .then(fullData => {
+                            if (fullData && fullData.text) {
+                                console.log("Diktattext erfolgreich nachgeladen, Länge:", fullData.text.length);
+                                prepareUtterance(fullData.text, dictation.speed);
+                                if (callback) callback();
+                                showStatus("Diktat erfolgreich geladen!");
+                            } else {
+                                throw new Error("Kein Text im Diktat gefunden.");
+                            }
+                        });
+                })
+                .catch(error => {
+                    console.error("Fehler beim erneuten Laden des Diktats:", error);
+                    showError("Diktattext konnte nicht geladen werden: " + error.message);
+                });
         }
         
         // Ganzes Diktat abspielen
         playButton.addEventListener('click', function() {
-            if (window.diktatFullText) {
+            // Direktes Laden vom aktuellen Diktat, falls die frühere Ladung fehlgeschlagen ist
+            if (!window.diktatFullText && currentDictationId) {
+                showStatus("Lade Diktat neu...");
+                reloadDictationText(currentDictationId, function() {
+                    // Nach erfolgreicher Ladung fortfahren
+                    playFullDictation();
+                });
+            } else {
+                playFullDictation();
+            }
+        });
+        
+        // Funktion zum Abspielen des gesamten Diktats
+        function playFullDictation() {
+            if (window.diktatFullText && window.diktatFullText.trim() !== '') {
                 // Text mit ausgesprochenen Satzzeichen vorbereiten
                 const textWithPunctuation = replacePunctuationWithWords(window.diktatFullText);
                 
                 // Text abspielen
-                speakText(textWithPunctuation, window.diktatSpeed);
+                speakText(textWithPunctuation, window.diktatSpeed || 1.0);
             } else {
-                showError("Diktattext konnte nicht geladen werden. Bitte versuche es erneut.");
+                showError("Diktattext konnte nicht geladen werden. Versuche das Diktat neu zu laden.");
             }
-        });
+        }
         
         // Abschnitt 1 abspielen
         section1Button.addEventListener('click', function() {
-            if (sections.length > 0) {
-                const textWithPunctuation = replacePunctuationWithWords(sections[0]);
-                speakText(textWithPunctuation, window.diktatSpeed);
+            if (!sections || sections.length === 0 || !sections[0]) {
+                if (currentDictationId) {
+                    showError("Lade Diktat neu...");
+                    reloadDictationText(currentDictationId, function() {
+                        if (sections && sections.length > 0 && sections[0]) {
+                            const textWithPunctuation = replacePunctuationWithWords(sections[0]);
+                            speakText(textWithPunctuation, window.diktatSpeed || 1.0);
+                        } else {
+                            showError("Konnte den Diktattext nicht laden. Bitte versuche es später erneut.");
+                        }
+                    });
+                } else {
+                    showError("Diktattext konnte nicht gefunden werden. Bitte lade das Diktat neu.");
+                }
             } else {
-                showError("Diktattext konnte nicht geladen werden. Bitte versuche es erneut.");
+                const textWithPunctuation = replacePunctuationWithWords(sections[0]);
+                speakText(textWithPunctuation, window.diktatSpeed || 1.0);
             }
         });
         
         // Abschnitt 2 abspielen
         section2Button.addEventListener('click', function() {
-            if (sections.length > 1) {
-                const textWithPunctuation = replacePunctuationWithWords(sections[1]);
-                speakText(textWithPunctuation, window.diktatSpeed);
+            if (!sections || sections.length < 2 || !sections[1]) {
+                if (currentDictationId) {
+                    showError("Lade Diktat neu...");
+                    reloadDictationText(currentDictationId, function() {
+                        if (sections && sections.length > 1 && sections[1]) {
+                            const textWithPunctuation = replacePunctuationWithWords(sections[1]);
+                            speakText(textWithPunctuation, window.diktatSpeed || 1.0);
+                        } else {
+                            showError("Konnte den Diktattext nicht laden. Bitte versuche es später erneut.");
+                        }
+                    });
+                } else {
+                    showError("Diktattext konnte nicht gefunden werden. Bitte lade das Diktat neu.");
+                }
             } else {
-                showError("Diktattext konnte nicht geladen werden. Bitte versuche es erneut.");
+                const textWithPunctuation = replacePunctuationWithWords(sections[1]);
+                speakText(textWithPunctuation, window.diktatSpeed || 1.0);
             }
         });
         
         // Abschnitt 3 abspielen
         section3Button.addEventListener('click', function() {
-            if (sections.length > 2) {
-                const textWithPunctuation = replacePunctuationWithWords(sections[2]);
-                speakText(textWithPunctuation, window.diktatSpeed);
+            if (!sections || sections.length < 3 || !sections[2]) {
+                if (currentDictationId) {
+                    showError("Lade Diktat neu...");
+                    reloadDictationText(currentDictationId, function() {
+                        if (sections && sections.length > 2 && sections[2]) {
+                            const textWithPunctuation = replacePunctuationWithWords(sections[2]);
+                            speakText(textWithPunctuation, window.diktatSpeed || 1.0);
+                        } else {
+                            showError("Konnte den Diktattext nicht laden. Bitte versuche es später erneut.");
+                        }
+                    });
+                } else {
+                    showError("Diktattext konnte nicht gefunden werden. Bitte lade das Diktat neu.");
+                }
             } else {
-                showError("Diktattext konnte nicht geladen werden. Bitte versuche es erneut.");
+                const textWithPunctuation = replacePunctuationWithWords(sections[2]);
+                speakText(textWithPunctuation, window.diktatSpeed || 1.0);
             }
         });
         
@@ -605,7 +767,7 @@
             }
             
             try {
-                const formData = new FormData();
+                const formData = new FormDataconst formData = new FormData();
                 formData.append('dictation_id', currentDictationId);
                 formData.append('user_text', userText);
                 formData.append('student_name', studentName);
@@ -614,6 +776,8 @@
                 const submitButton = this.querySelector('button[type="submit"]');
                 submitButton.textContent = 'Wird überprüft...';
                 submitButton.disabled = true;
+                
+                showStatus("Überprüfe dein Diktat...");
                 
                 const response = await fetch('/check_dictation', {
                     method: 'POST',
