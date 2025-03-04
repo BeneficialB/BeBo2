@@ -127,6 +127,19 @@
             padding: 15px;
         }
 
+        /* Diktat-Navigationsbuttons */
+        .navigation-controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .navigation-controls button {
+            flex: 1;
+            font-size: 12px;
+            padding: 10px;
+        }
+
         /* Diktat-Eingabe */
         #dictation-input {
             min-height: 150px;
@@ -221,7 +234,7 @@
                 padding-right: 0;
             }
 
-            .audio-controls {
+            .audio-controls, .navigation-controls {
                 flex-direction: column;
             }
         }
@@ -253,10 +266,17 @@
             <div id="dictation-section" style="display: none;">
                 <h2 id="dictation-title">Titel des Diktats</h2>
                 
-                <!-- Audio-Steuerung - vereinfacht auf 2 Buttons -->
+                <!-- Audio-Steuerung - einfache Buttons -->
                 <div class="audio-controls">
-                    <button id="play-button">Diktat abspielen</button>
-                    <button id="restart-button">Von vorne beginnen</button>
+                    <button id="play-button">Ganzes Diktat abspielen</button>
+                    <button id="stop-button">Stoppen</button>
+                </div>
+                
+                <!-- Satz-Navigation -->
+                <div class="navigation-controls">
+                    <button id="section1-button">Abschnitt 1</button>
+                    <button id="section2-button">Abschnitt 2</button>
+                    <button id="section3-button">Abschnitt 3</button>
                 </div>
                 
                 <!-- Diktat-Eingabe -->
@@ -300,7 +320,10 @@
         const dictationSection = document.getElementById('dictation-section');
         const dictationTitle = document.getElementById('dictation-title');
         const playButton = document.getElementById('play-button');
-        const restartButton = document.getElementById('restart-button');
+        const stopButton = document.getElementById('stop-button');
+        const section1Button = document.getElementById('section1-button');
+        const section2Button = document.getElementById('section2-button');
+        const section3Button = document.getElementById('section3-button');
         const dictationForm = document.getElementById('dictation-form');
         const dictationInput = document.getElementById('dictation-input');
         const resultSection = document.getElementById('result-section');
@@ -313,9 +336,7 @@
         let currentDictationId = null;
         let dictationSpeed = 1.0;
         let studentName = '';
-        let currentSentenceIndex = 0;
-        let sentences = [];
-        let isSpeaking = false;
+        let sections = [];
         
         // Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
         function replacePunctuationWithWords(text) {
@@ -401,107 +422,82 @@
             window.diktatFullText = text;
             window.diktatSpeed = speed;
             
-            // Text in Sätze aufteilen
-            sentences = [];
-            const sentenceRegex = /[^.!?]+[.!?]+/g;
-            const matches = text.match(sentenceRegex);
+            // Text in 3 etwa gleich große Abschnitte teilen
+            const words = text.split(/\s+/);
+            const sectionSize = Math.ceil(words.length / 3);
             
-            if (matches) {
-                sentences = matches;
-            } else {
-                sentences = [text]; // Falls keine Satzzeichen gefunden wurden
-            }
+            sections = [
+                words.slice(0, sectionSize).join(' '),
+                words.slice(sectionSize, sectionSize * 2).join(' '),
+                words.slice(sectionSize * 2).join(' ')
+            ];
             
-            // Zurücksetzen
-            currentSentenceIndex = 0;
-            isSpeaking = false;
+            // Abschnitt-Buttons Beschriftung aktualisieren
+            section1Button.textContent = "Abschnitt 1 (Anfang)";
+            section2Button.textContent = "Abschnitt 2 (Mitte)";
+            section3Button.textContent = "Abschnitt 3 (Ende)";
         }
         
-        // Audio-Steuerung mit "Weitersprechen"-Funktion
+        // Ganzes Diktat abspielen
         playButton.addEventListener('click', function() {
             if (window.diktatFullText) {
-                if (isSpeaking) {
-                    // Wenn spielt, dann stoppen und Button-Text ändern
+                // Bestehende Sprachausgabe stoppen
+                if (responsiveVoice.isPlaying()) {
                     responsiveVoice.cancel();
-                    this.textContent = "Diktat fortsetzen";
-                    isSpeaking = false;
-                } else {
-                    // Wenn gestoppt/pausiert, dann starten/fortsetzen
-                    
-                    // Funktion zum Sprechen der Sätze nacheinander
-                    const speakFromCurrentPosition = () => {
-                        if (currentSentenceIndex < sentences.length) {
-                            // Aktuellen Satz mit Satzzeichen-Vorlesung vorbereiten
-                            const sentence = replacePunctuationWithWords(sentences[currentSentenceIndex]);
-                            
-                            responsiveVoice.speak(sentence, 'Deutsch Male', {
-                                rate: window.diktatSpeed,
-                                onend: function() {
-                                    // Zum nächsten Satz und weitersprechen
-                                    currentSentenceIndex++;
-                                    if (isSpeaking && currentSentenceIndex < sentences.length) {
-                                        speakFromCurrentPosition();
-                                    } else if (currentSentenceIndex >= sentences.length) {
-                                        // Ende erreicht
-                                        playButton.textContent = "Diktat abspielen";
-                                        isSpeaking = false;
-                                        currentSentenceIndex = 0; // Zurück zum Anfang
-                                    }
-                                }
-                            });
-                        }
-                    };
-                    
-                    // Starten
-                    isSpeaking = true;
-                    this.textContent = "Diktat stoppen";
-                    speakFromCurrentPosition();
                 }
+                
+                // Text mit ausgesprochenen Satzzeichen vorbereiten
+                const textWithPunctuation = replacePunctuationWithWords(window.diktatFullText);
+                
+                // Text abspielen
+                responsiveVoice.speak(textWithPunctuation, 'Deutsch Male', {
+                    rate: window.diktatSpeed
+                });
             }
         });
         
-        // Von vorne beginnen Button
-        restartButton.addEventListener('click', function() {
-            if (isSpeaking) {
+        // Stoppen-Button
+        stopButton.addEventListener('click', function() {
+            if (responsiveVoice.isPlaying()) {
                 responsiveVoice.cancel();
             }
-            
-            // Zurück zum Anfang
-            currentSentenceIndex = 0;
-            
-            if (window.diktatFullText) {
-                // Ersten Satz sprechen
-                const sentence = replacePunctuationWithWords(sentences[0]);
-                
-                isSpeaking = true;
-                playButton.textContent = "Diktat stoppen";
-                
-                responsiveVoice.speak(sentence, 'Deutsch Male', {
-                    rate: window.diktatSpeed,
-                    onend: function() {
-                        currentSentenceIndex++;
-                        if (isSpeaking && currentSentenceIndex < sentences.length) {
-                            // Nächster Satz automatisch
-                            const speakNext = () => {
-                                if (currentSentenceIndex < sentences.length && isSpeaking) {
-                                    const nextSentence = replacePunctuationWithWords(sentences[currentSentenceIndex]);
-                                    responsiveVoice.speak(nextSentence, 'Deutsch Male', {
-                                        rate: window.diktatSpeed,
-                                        onend: function() {
-                                            currentSentenceIndex++;
-                                            if (isSpeaking) speakNext();
-                                            else if (currentSentenceIndex >= sentences.length) {
-                                                playButton.textContent = "Diktat abspielen";
-                                                isSpeaking = false;
-                                                currentSentenceIndex = 0;
-                                            }
-                                        }
-                                    });
-                                }
-                            };
-                            speakNext();
-                        }
-                    }
+        });
+        
+        // Abschnitt 1 abspielen
+        section1Button.addEventListener('click', function() {
+            if (sections.length > 0) {
+                if (responsiveVoice.isPlaying()) {
+                    responsiveVoice.cancel();
+                }
+                const textWithPunctuation = replacePunctuationWithWords(sections[0]);
+                responsiveVoice.speak(textWithPunctuation, 'Deutsch Male', {
+                    rate: window.diktatSpeed
+                });
+            }
+        });
+        
+        // Abschnitt 2 abspielen
+        section2Button.addEventListener('click', function() {
+            if (sections.length > 1) {
+                if (responsiveVoice.isPlaying()) {
+                    responsiveVoice.cancel();
+                }
+                const textWithPunctuation = replacePunctuationWithWords(sections[1]);
+                responsiveVoice.speak(textWithPunctuation, 'Deutsch Male', {
+                    rate: window.diktatSpeed
+                });
+            }
+        });
+        
+        // Abschnitt 3 abspielen
+        section3Button.addEventListener('click', function() {
+            if (sections.length > 2) {
+                if (responsiveVoice.isPlaying()) {
+                    responsiveVoice.cancel();
+                }
+                const textWithPunctuation = replacePunctuationWithWords(sections[2]);
+                responsiveVoice.speak(textWithPunctuation, 'Deutsch Male', {
+                    rate: window.diktatSpeed
                 });
             }
         });
@@ -552,7 +548,6 @@
                 if (responsiveVoice.isPlaying()) {
                     responsiveVoice.cancel();
                 }
-                isSpeaking = false;
                 
                 // Button-Status zurücksetzen
                 submitButton.textContent = 'Überprüfen';
@@ -583,10 +578,7 @@
             }
             window.diktatFullText = null;
             currentDictationId = null;
-            playButton.textContent = "Diktat abspielen";
-            isSpeaking = false;
-            currentSentenceIndex = 0;
-            sentences = [];
+            sections = [];
         });
     </script>
     
