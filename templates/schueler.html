@@ -529,20 +529,23 @@
                 // Eingabefeld leeren
                 dictationInput.value = '';
                 
-                // Vollständigen Diktattext vom Lehrer-Endpunkt laden
+                // Text für die Sprachausgabe vom speziellen Endpunkt laden
                 try {
-                    // Also use encodeURIComponent here
-                    const fullDictationResponse = await fetch(`/get_full_dictation/${encodeURIComponent(dictationId)}`);
-                    if (!fullDictationResponse.ok) {
-                        console.error('Vollständigen Diktattext nicht geladen (nur für Lehrer)');
-                    } else {
-                        const fullDictation = await fullDictationResponse.json();
-                        // Sprachausgabe vorbereiten
-                        prepareDictation(fullDictation.text, dictation.speed);
+                    // Benutze die spezielle Route für Audiotext
+                    const audioResponse = await fetch(`/get_dictation_audio/${encodeURIComponent(dictationId)}`);
+                    if (!audioResponse.ok) {
+                        throw new Error('Fehler beim Laden des Diktattextes');
                     }
+                    
+                    const audioData = await audioResponse.json();
+                    
+                    // Sprachausgabe vorbereiten
+                    prepareDictation(audioData.text, audioData.speed);
+                    console.log("Diktattext für Sprachausgabe geladen, Länge:", audioData.text.length);
+                    audioStatus.textContent = "Diktat geladen. Klicke auf 'Diktat abspielen'.";
                 } catch (err) {
-                    console.error('Fehler beim Laden des vollständigen Textes:', err);
-                    // Continue even if this fails since it's expected for student view
+                    console.error('Fehler beim Laden des Diktattextes:', err);
+                    audioStatus.textContent = "Fehler beim Laden des Diktattextes. Bitte versuche es erneut.";
                 }
                 
             } catch (error) {
