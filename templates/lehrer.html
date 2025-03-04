@@ -615,7 +615,8 @@
         // Diktat löschen
         async function deleteDictation(dictationId) {
             try {
-                const response = await fetch(`/delete_dictation/${dictationId}`, {
+                // Add encodeURIComponent here
+                const response = await fetch(`/delete_dictation/${encodeURIComponent(dictationId)}`, {
                     method: 'POST'
                 });
                 
@@ -637,7 +638,8 @@
         // Diktat-Details laden
         async function loadDictationDetails(dictationId) {
             try {
-                const response = await fetch(`/get_full_dictation/${dictationId}`);
+                // Add encodeURIComponent here
+                const response = await fetch(`/get_full_dictation/${encodeURIComponent(dictationId)}`);
                 const dictation = await response.json();
                 
                 // Details anzeigen
