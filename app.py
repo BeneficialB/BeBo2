@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, Response
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_file
 import anthropic
 import os
 import random
@@ -8,13 +8,19 @@ import requests
 from datetime import datetime
 from functools import wraps
 from dotenv import load_dotenv
+import io
+import uuid
 
 # Lade die Umgebungsvariablen aus .env
 load_dotenv()
 
 # API-Schlüssel
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
-ELEVEN_LABS_API_KEY = os.getenv("ELEVEN_LABS_API_KEY")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+
+# Prüfe, ob der Elevenlabs API-Key gesetzt ist
+if not ELEVENLABS_API_KEY:
+    raise ValueError("❌ FEHLER: Elevenlabs API-Key nicht gefunden! Stelle sicher, dass die .env-Datei existiert.")
 
 # Passwort für den Lehrerbereich
 TEACHER_PASSWORD = "Hamburg1!"
@@ -30,18 +36,95 @@ client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "diktate-sind-cool-aber-geheim")
 
+# Pfad für gespeicherte Audiodateien
+AUDIO_DIR = os.path.join(app.static_folder or 'static', 'audio')
+os.makedirs(AUDIO_DIR, exist_ok=True)
+
 # Datenbank-Simulation für Diktate und Ergebnisse (im Produktiveinsatz durch eine echte DB ersetzen)
 dictations = {}
 results = []  # Hier werden die Schülerergebnisse gespeichert
-
-# Deutsche Stimme für die TTS - Otto
-GERMAN_VOICE_ID = "FTNCalFNG5bRnkkaP5Ug"  # Otto (deutsche Stimme)
 
 # Hilfsfunktion für Diktat-ID-Generierung
 def generate_dictation_id(length=6):
     """Generiert eine zufällige Diktat-ID aus Buchstaben und Zahlen."""
     characters = string.ascii_uppercase + string.digits
     return ''.join(random.choice(characters) for _ in range(length))
+
+# Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
+def replace_punctuation_with_words(text):
+    """Ersetzt Satzzeichen durch gesprochene Wörter für die Diktat-Ausgabe."""
+    return text.replace(".", " Punkt ") \
+               .replace(",", " Komma ") \
+               .replace(";", " Semikolon ") \
+               .replace(":", " Doppelpunkt ") \
+               .replace("?", " Fragezeichen ") \
+               .replace("!", " Ausrufezeichen ") \
+               .replace("(", " Klammer auf ") \
+               .replace(")", " Klammer zu ") \
+               .replace("\"", " Anführungszeichen ") \
+               .replace("'", " Apostroph ") \
+               .replace("-", " Bindestrich ") \
+               .replace("/", " Schrägstrich ")
+
+# Funktion zur Generierung von Audio mit Elevenlabs
+def generate_audio_with_elevenlabs(text, speed=1.0):
+    """Generiert eine Audiodatei mit Elevenlabs TTS."""
+    url = "https://api.elevenlabs.io/v1/text-to-speech/ThT5KcBeYPX3keUQqHPh"  # Voice ID für "Daniel" (deutsche Stimme)
+    
+    # Text mit ausgesprochenen Satzzeichen
+    text_with_spoken_punctuation = replace_punctuation_with_words(text)
+    
+    headers = {
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+        "xi-api-key": ELEVENLABS_API_KEY
+    }
+    
+    # Geschwindigkeitsanpassung über die stability_settings
+    # Elevenlabs verwendet andere Parameter als ResponsiveVoice, daher Anpassung nötig
+    stability = 0.5  # Standardstabilität
+    
+    # Die Geschwindigkeit wird durch die Anpassung der stability_settings simuliert
+    # Höhere speed = niedrigere stability für schnelleres Sprechen
+    if speed > 1.0:
+        stability = max(0.1, 0.5 - ((speed - 1.0) * 0.2))
+    # Niedrigere speed = höhere stability für langsameres Sprechen
+    elif speed < 1.0:
+        stability = min(0.9, 0.5 + ((1.0 - speed) * 0.2))
+    
+    data = {
+        "text": text_with_spoken_punctuation,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {
+            "stability": stability,
+            "similarity_boost": 0.75
+        }
+    }
+    
+    try:
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code == 200:
+            return response.content
+        else:
+            print(f"Fehler bei der Elevenlabs API: {response.status_code}, {response.text}")
+            return None
+    except Exception as e:
+        print(f"Fehler bei der Elevenlabs API: {str(e)}")
+        return None
+
+# Funktion zum Teilen eines Textes in gleichmäßige Abschnitte
+def split_text_into_sections(text, num_sections=3):
+    """Teilt den Text in die angegebene Anzahl an Abschnitten."""
+    words = text.split()
+    section_size = len(words) // num_sections
+    sections = []
+    
+    for i in range(num_sections):
+        start = i * section_size
+        end = (i + 1) * section_size if i < num_sections - 1 else len(words)
+        sections.append(' '.join(words[start:end]))
+    
+    return sections
 
 # Dekorator für passwortgeschützte Routen
 def teacher_login_required(f):
@@ -88,141 +171,10 @@ def student_view():
     """Render die Schüleransicht."""
     return render_template("schueler.html")
 
-@app.route("/env_check")
-def env_check():
-    """Einfacher Endpunkt zur Überprüfung der Umgebungsvariablen"""
-    env_vars = {
-        "ELEVEN_LABS_API_KEY": ELEVEN_LABS_API_KEY is not None,
-        "ELEVEN_LABS_KEY_LENGTH": len(ELEVEN_LABS_API_KEY) if ELEVEN_LABS_API_KEY else 0,
-        "ELEVEN_LABS_KEY_START": ELEVEN_LABS_API_KEY[:5] + "..." if ELEVEN_LABS_API_KEY else "None",
-        "CLAUDE_API_KEY": CLAUDE_API_KEY is not None,
-        "GERMAN_VOICE_ID": GERMAN_VOICE_ID,
-        "VOICE_NAME": "Otto"
-    }
-    return jsonify(env_vars)
-
-@app.route("/elevenlabs_test")
-def elevenlabs_test():
-    """Einfacher Test für die Eleven Labs API mit Otto-Stimme"""
-    if not ELEVEN_LABS_API_KEY:
-        return jsonify({
-            "success": False,
-            "error": "Eleven Labs API-Schlüssel nicht gefunden!"
-        })
-    
-    test_text = "Hallo, ich bin Otto. Ich helfe dir bei deinem Diktat."
-    
-    try:
-        # Eleven Labs API aufrufen
-        api_url = f"https://api.elevenlabs.io/v1/text-to-speech/{GERMAN_VOICE_ID}"
-        
-        response = requests.post(
-            api_url,
-            headers={
-                "Content-Type": "application/json",
-                "xi-api-key": ELEVEN_LABS_API_KEY
-            },
-            json={
-                "text": test_text,
-                "model_id": "eleven_multilingual_v2"
-            }
-        )
-        
-        if response.ok:
-            return Response(
-                response.content,
-                mimetype="audio/mpeg",
-                headers={"Cache-Control": "no-cache"}
-            )
-        else:
-            return jsonify({
-                "success": False,
-                "status_code": response.status_code,
-                "error": response.text
-            })
-    
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        })
-
-@app.route("/validate_eleven_key")
-def validate_eleven_key():
-    """Überprüft, ob der Eleven Labs API-Schlüssel korrekt funktioniert"""
-    print("=== ELEVEN LABS TOKEN CHECK ===")
-    
-    if not ELEVEN_LABS_API_KEY:
-        return jsonify({
-            "valid": False,
-            "error": "API-Schlüssel nicht konfiguriert"
-        })
-    
-    try:
-        # Einfachen API-Aufruf machen, um die Gültigkeit zu prüfen
-        response = requests.get(
-            "https://api.elevenlabs.io/v1/user/subscription",
-            headers={"xi-api-key": ELEVEN_LABS_API_KEY}
-        )
-        
-        print(f"Subscription API Status Code: {response.status_code}")
-        
-        if response.ok:
-            subscription_data = response.json()
-            print(f"Subscription Daten: {json.dumps(subscription_data)}")
-            
-            # Stimmen abrufen
-            voices_response = requests.get(
-                "https://api.elevenlabs.io/v1/voices",
-                headers={"xi-api-key": ELEVEN_LABS_API_KEY}
-            )
-            
-            if voices_response.ok:
-                voices_data = voices_response.json()
-                voices = [{"voice_id": v["voice_id"], "name": v["name"]} 
-                         for v in voices_data.get("voices", [])]
-                
-                # Prüfen, ob unsere Otto-Stimme verfügbar ist
-                otto_available = any(v["voice_id"] == GERMAN_VOICE_ID for v in voices)
-                
-                # Detaillierte API-Informationen zurückgeben
-                return jsonify({
-                    "valid": True,
-                    "subscription": subscription_data,
-                    "voices_count": len(voices),
-                    "voices": voices,
-                    "otto_available": otto_available,
-                    "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
-                })
-            else:
-                print(f"Fehler beim Abrufen der Stimmen: {voices_response.status_code}")
-                print(f"Antwort: {voices_response.text}")
-                return jsonify({
-                    "valid": False, 
-                    "error": f"Stimmen-API-Fehler: {voices_response.status_code}",
-                    "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
-                })
-        else:
-            print(f"Fehlerantwort: {response.text}")
-            return jsonify({
-                "valid": False,
-                "error": f"API-Schlüssel ungültig oder abgelaufen: {response.status_code}",
-                "details": response.text,
-                "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
-            })
-    
-    except Exception as e:
-        print(f"Ausnahme bei der API-Validierung: {str(e)}")
-        return jsonify({
-            "valid": False,
-            "error": str(e),
-            "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
-        })
-
 @app.route("/create_dictation", methods=["POST"])
 @teacher_login_required
 def create_dictation():
-    """Erstellt ein neues Diktat."""
+    """Erstellt ein neues Diktat und generiert die Audiodateien."""
     # Daten aus dem Formular holen
     title = request.form.get("title", "Unbenanntes Diktat")
     text = request.form.get("text")
@@ -235,6 +187,31 @@ def create_dictation():
         # Eindeutige ID für das Diktat generieren
         dictation_id = generate_dictation_id()
         
+        # Generiere Audio für das gesamte Diktat
+        full_audio = generate_audio_with_elevenlabs(text, speed)
+        if not full_audio:
+            return jsonify({"error": "Fehler bei der Audio-Generierung."}), 500
+        
+        # Speichere die Audio-Datei
+        full_audio_filename = f"{dictation_id}_full.mp3"
+        full_audio_path = os.path.join(AUDIO_DIR, full_audio_filename)
+        with open(full_audio_path, 'wb') as f:
+            f.write(full_audio)
+        
+        # Teile das Diktat in Abschnitte
+        sections = split_text_into_sections(text)
+        section_audio_files = []
+        
+        # Generiere und speichere Audio für jeden Abschnitt
+        for i, section_text in enumerate(sections):
+            section_audio = generate_audio_with_elevenlabs(section_text, speed)
+            if section_audio:
+                section_filename = f"{dictation_id}_section{i+1}.mp3"
+                section_path = os.path.join(AUDIO_DIR, section_filename)
+                with open(section_path, 'wb') as f:
+                    f.write(section_audio)
+                section_audio_files.append(section_filename)
+        
         # Diktat speichern
         dictation_info = {
             "id": dictation_id,
@@ -242,7 +219,9 @@ def create_dictation():
             "text": text,
             "speed": speed,
             "created_at": datetime.now().isoformat(),
-            "word_count": len(text.split())  # Wortanzahl für die spätere Prozentberechnung
+            "word_count": len(text.split()),  # Wortanzahl für die spätere Prozentberechnung
+            "audio_file": full_audio_filename,
+            "section_audio_files": section_audio_files
         }
         
         dictations[dictation_id] = dictation_info
@@ -256,16 +235,37 @@ def create_dictation():
     except Exception as e:
         return jsonify({"error": f"Fehler beim Erstellen des Diktats: {str(e)}"}), 500
 
+@app.route("/audio/<filename>")
+def get_audio(filename):
+    """Gibt eine Audiodatei zurück."""
+    try:
+        return send_file(os.path.join(AUDIO_DIR, filename), mimetype="audio/mpeg")
+    except Exception as e:
+        return jsonify({"error": f"Fehler beim Laden der Audiodatei: {str(e)}"}), 404
+
 @app.route("/delete_dictation/<dictation_id>", methods=["POST"])
 @teacher_login_required
 def delete_dictation(dictation_id):
-    """Löscht ein Diktat."""
-    print(f"Delete request for dictation_id: {dictation_id}")
-    
+    """Löscht ein Diktat und die zugehörigen Audiodateien."""
     if dictation_id not in dictations:
         return jsonify({"error": "Diktat nicht gefunden."}), 404
     
     try:
+        # Audiodateien löschen
+        dictation = dictations[dictation_id]
+        audio_file = dictation.get("audio_file")
+        if audio_file:
+            audio_path = os.path.join(AUDIO_DIR, audio_file)
+            if os.path.exists(audio_path):
+                os.remove(audio_path)
+        
+        # Abschnitts-Audiodateien löschen
+        section_files = dictation.get("section_audio_files", [])
+        for section_file in section_files:
+            section_path = os.path.join(AUDIO_DIR, section_file)
+            if os.path.exists(section_path):
+                os.remove(section_path)
+        
         # Diktat löschen
         del dictations[dictation_id]
         
@@ -281,9 +281,6 @@ def delete_dictation(dictation_id):
 @app.route("/get_dictation/<dictation_id>")
 def get_dictation(dictation_id):
     """Gibt Informationen zu einem Diktat zurück, ohne den Originaltext."""
-    # Log the received ID (helpful for debugging)
-    print(f"Received dictation_id: {dictation_id}")
-    
     if dictation_id not in dictations:
         return jsonify({"error": "Diktat nicht gefunden."}), 404
     
@@ -292,98 +289,6 @@ def get_dictation(dictation_id):
     dictation.pop("text", None)  # Originaltext entfernen
     
     return jsonify(dictation)
-
-@app.route("/get_dictation_audio/<dictation_id>")
-def get_dictation_audio(dictation_id):
-    """Gibt den Diktattext für die Sprachausgabe zurück (keine visuelle Anzeige für Schüler)."""
-    print(f"Audio request for dictation_id: {dictation_id}")
-    
-    if dictation_id not in dictations:
-        return jsonify({"error": "Diktat nicht gefunden."}), 404
-    
-    # Nur Text und Geschwindigkeit zurückgeben, für die Sprachausgabe
-    return jsonify({
-        "text": dictations[dictation_id]["text"],
-        "speed": dictations[dictation_id]["speed"]
-    })
-
-@app.route("/elevenlabs_tts", methods=["POST"])
-def elevenlabs_tts():
-    """Proxy für die Eleven Labs API, um den API-Schlüssel zu schützen."""
-    # API-Schlüssel aus Umgebungsvariablen laden
-    if not ELEVEN_LABS_API_KEY:
-        print("❌ Eleven Labs API-Schlüssel fehlt!")
-        return jsonify({"error": "Eleven Labs API-Schlüssel nicht konfiguriert."}), 500
-
-    # Daten aus der Anfrage holen
-    try:
-        data = request.json
-        print(f"Received request for TTS")
-    except Exception as e:
-        print(f"Error parsing request data: {e}")
-        return jsonify({"error": "Ungültige JSON-Daten"}), 400
-    
-    text = data.get("text")
-    # Standardmäßig die Otto-Stimme verwenden
-    voice_id = data.get("voice_id", GERMAN_VOICE_ID)
-    
-    if not text:
-        return jsonify({"error": "Kein Text angegeben."}), 400
-
-    # Textlänge begrenzen, um Probleme mit der API zu vermeiden
-    if len(text) > 300:
-        text = text[:300] + "..."
-        print("Text was truncated to 300 characters due to length restrictions")
-
-    try:
-        # Eleven Labs API aufrufen
-        api_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-        
-        # Einfache Payload mit minimalen Parametern
-        payload = {
-            "text": text,
-            "model_id": "eleven_multilingual_v2"
-        }
-        
-        print(f"Sende Anfrage an Eleven Labs API mit Stimme: {voice_id}")
-        print(f"API-Schlüssel (erste 5 Zeichen): {ELEVEN_LABS_API_KEY[:5]}...")
-        
-        response = requests.post(
-            api_url,
-            headers={
-                "Content-Type": "application/json",
-                "xi-api-key": ELEVEN_LABS_API_KEY
-            },
-            json=payload
-        )
-        
-        # Response-Status protokollieren
-        print(f"Eleven Labs API Status Code: {response.status_code}")
-        
-        # Antwort überprüfen
-        if not response.ok:
-            error_msg = f"Eleven Labs API-Fehler: {response.status_code}"
-            try:
-                error_json = response.json()
-                error_msg += f" - {json.dumps(error_json)}"
-            except:
-                error_msg += f" - {response.text}"
-            
-            print(error_msg)
-            return jsonify({"error": error_msg}), response.status_code
-        
-        print("✅ Eleven Labs API erfolgreiche Antwort!")
-        # Audio-Daten zurückgeben
-        return Response(
-            response.content,
-            mimetype="audio/mpeg",
-            headers={"Cache-Control": "no-cache"}
-        )
-        
-    except Exception as e:
-        error_msg = f"Fehler bei der Eleven Labs API: {str(e)}"
-        print(error_msg)
-        return jsonify({"error": error_msg}), 500
 
 @app.route("/get_dictations")
 @teacher_login_required
@@ -404,9 +309,6 @@ def get_dictations():
 @teacher_login_required
 def get_full_dictation(dictation_id):
     """Gibt vollständige Informationen zu einem Diktat zurück, einschließlich Text (nur für Lehreransicht)."""
-    # Log the received ID (helpful for debugging)
-    print(f"Received full dictation_id: {dictation_id}")
-    
     if dictation_id not in dictations:
         return jsonify({"error": "Diktat nicht gefunden."}), 404
     
@@ -419,8 +321,6 @@ def check_dictation():
     dictation_id = request.form.get("dictation_id")
     user_text = request.form.get("user_text")
     student_name = request.form.get("student_name", "Unbekannt")
-    
-    print(f"Checking dictation: {dictation_id}, student: {student_name}")
     
     if not dictation_id or not user_text:
         return jsonify({"error": "Fehlende Eingaben."}), 400
