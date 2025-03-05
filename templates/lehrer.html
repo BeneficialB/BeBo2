@@ -327,20 +327,7 @@
             background-color: #ff3333;
         }
 
-        /* Audio-Player Stil */
-        .audio-player {
-            background: #222222;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 5px;
-            border: 2px solid #ff9900;
-        }
-
-        audio {
-            width: 100%;
-            margin: 10px 0;
-        }
-
+        /* Loading indicator */
         .loading-indicator {
             color: #ffcc00;
             text-align: center;
@@ -429,15 +416,6 @@
                     <p><strong>Text:</strong></p>
                     <pre id="detail-text"></pre>
                     
-                    <!-- Audio-Player für Vorschau -->
-                    <div class="audio-player">
-                        <p>Diktat anhören:</p>
-                        <audio id="preview-audio" controls>
-                            <source src="" type="audio/mpeg">
-                            Dein Browser unterstützt keine Audio-Wiedergabe.
-                        </audio>
-                    </div>
-                    
                     <button id="back-to-list">Zurück zur Liste</button>
                 </div>
             </div>
@@ -498,7 +476,6 @@
         const detailId = document.getElementById('detail-id');
         const detailDate = document.getElementById('detail-date');
         const detailText = document.getElementById('detail-text');
-        const previewAudio = document.getElementById('preview-audio');
         const backToListButton = document.getElementById('back-to-list');
         const refreshResultsButton = document.getElementById('refresh-results');
         const resultsBody = document.getElementById('results-body');
@@ -670,12 +647,6 @@
                 detailDate.textContent = formatDate(dictation.created_at);
                 detailText.textContent = dictation.text;
                 
-                // Audio-Player einrichten
-                if (dictation.audio_file) {
-                    previewAudio.src = `/audio/${dictation.audio_file}`;
-                    previewAudio.load();
-                }
-                
                 // UI aktualisieren
                 dictationList.style.display = 'none';
                 refreshListButton.style.display = 'none';
@@ -692,9 +663,6 @@
             dictationDetails.style.display = 'none';
             dictationList.style.display = 'block';
             refreshListButton.style.display = 'block';
-            
-            // Audio pausieren
-            previewAudio.pause();
         });
         
         // Ergebnisse laden
