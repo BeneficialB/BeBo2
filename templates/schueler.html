@@ -1,166 +1,868 @@
-<!-- Rest des Codes bleibt gleich, nur die relevanten JavaScript-Teile werden hier gezeigt -->
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeBoDiktat - Schüler:innen-Ansicht</title>
+    <style>
+        /* Retro-Hintergrundraster (genau wie im BeBo-Korrektur-Tool) */
+        body {
+            font-family: 'Press Start 2P', monospace; /* Retro-Schrift */
+            padding: 10px;
+            margin: 0;
+            background: linear-gradient(to bottom, #111111, #222222); /* Dunkler Verlauf */
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
 
-<script>
-    // DOM-Elemente und andere Variablen...
+        /* Scrollendes Raster */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            animation: scroll-grid 10s linear infinite;
+            z-index: -1; /* Hinter dem Inhalt */
+        }
 
-    // Funktion zum Aufrufen der Eleven Labs API über Backend-Proxy
-    async function speakWithElevenLabs(text, voiceId = "NLdsrIcUBS4NcgKkzSzj") { // Nicole (Deutsch)
-        try {
+        @keyframes scroll-grid {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-20px, -20px); }
+        }
+
+        /* Hauptcontainer */
+        .container {
+            display: flex;
+            background: #333333; /* Dunkler Container */
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 100%;
+            margin: 10px auto;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+            border: 3px solid #ff9900; /* Orange-Rahmen */
+        }
+
+        /* Textbereich */
+        .text-section {
+            flex: 1;
+            padding-right: 10px;
+        }
+
+        h1, h2 {
+            color: #ffcc00;
+            text-shadow: 2px 2px #000000; /* Retro-Textschatten */
+        }
+
+        h1 {
+            font-size: 18px;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin-top: 15px;
+        }
+
+        p {
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        /* Formular */
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        input, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 2px solid #ff9900;
+            font-family: 'Press Start 2P', monospace;
+            background: #222222;
+            color: #ffcc00;
+        }
+
+        button {
+            background-color: #ff9900;
+            color: #222222;
+            border: none;
+            cursor: pointer;
+            animation: glow 1.5s infinite; /* Leuchtender Effekt */
+        }
+
+        button:hover {
+            background-color: #ffcc00;
+        }
+
+        button:disabled {
+            background-color: #666666;
+            animation: none;
+            cursor: not-allowed;
+        }
+
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px #ff9900; }
+            50% { box-shadow: 0 0 20px #ffcc00; }
+            100% { box-shadow: 0 0 5px #ff9900; }
+        }
+
+        /* Audio-Player und Kontrollbereich */
+        .audio-controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .audio-controls button {
+            flex: 1;
+            font-size: 12px;
+            padding: 10px;
+        }
+
+        /* Diktat-Navigationsbuttons */
+        .navigation-controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .navigation-controls button {
+            flex: 1;
+            font-size: 12px;
+            padding: 8px;
+            min-width: initial;
+            max-width: 60px;
+        }
+
+        /* Diktat-Eingabe */
+        #dictation-input {
+            min-height: 150px;
+            margin: 15px 0;
+        }
+
+        /* Ergebnisbereich */
+        pre {
+            background: #222222;
+            color: #ffffff;
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid #ff9900;
+            text-align: left;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 15px 0;
+        }
+
+        /* Link zurück zur Startseite */
+        .home-link {
+            display: block;
+            margin: 15px 0;
+            color: #ffcc00;
+            text-decoration: none;
+            font-size: 12px;
+        }
+
+        .home-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Bildbereich */
+        .image-section {
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .image-section img {
+            max-width: 120px;
+            height: auto;
+            border: 2px solid #ffcc00;
+            border-radius: 10px;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+            animation: wobble 2s infinite; /* Wippen */
+            transform-origin: bottom; /* Schwenkpunkt unten */
+            position: sticky;
+            top: 20px;
+        }
+
+        @keyframes wobble {
+            0% { transform: translateY(0); }
+            25% { transform: translateY(-5px); }
+            50% { transform: translateY(0); }
+            75% { transform: translateY(5px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Ergebnisanzeige */
+        .result-summary {
+            background: #222222;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            border: 2px solid #00ccff;
+            text-align: center;
+        }
+
+        .score {
+            font-size: 20px;
+            color: #00ccff;
+            margin: 10px 0;
+        }
+
+        .percent {
+            font-size: 20px;
+            color: #00ccff;
+            margin: 10px 0;
+        }
+
+        /* Audio-Status-Anzeige */
+        .audio-status {
+            background: #222222;
+            color: #00ccff;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 10px;
+            margin: 5px 0;
+            text-align: center;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                width: 90%;
+            }
+
+            .text-section {
+                padding-right: 0;
+                width: 100%;
+            }
+
+            .audio-controls {
+                flex-direction: column;
+            }
+            
+            .navigation-controls {
+                display: flex;
+                flex-direction: row;
+                justify-content: center;
+            }
+            
+            .navigation-controls button {
+                flex: 0 1 auto;
+                width: 30%;
+                font-size: 11px;
+                padding: 6px;
+            }
+            
+            .image-section {
+                margin-top: 20px;
+            }
+            
+            body {
+                padding: 5px;
+            }
+            
+            h1 {
+                font-size: 16px;
+            }
+        }
+    </style>
+    <!-- Google Fonts: Retro-Schriftart -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Linker Bereich mit Text -->
+        <div class="text-section">
+            <h1>BeBoDiktat – Schüler:innen-Ansicht</h1>
+            <p>Gib die Diktat-ID ein, die du von deiner Lehrkraft erhalten hast.</p>
+            
+            <!-- Diktat-ID-Eingabe -->
+            <div id="id-input-section">
+                <form id="id-form">
+                    <label for="dictation-id">Diktat-ID:</label>
+                    <input type="text" id="dictation-id" placeholder="z.B. ABC123" required>
+                    
+                    <label for="student-name">Dein Name:</label>
+                    <input type="text" id="student-name" placeholder="Dein Name" required>
+                    
+                    <button type="submit">Diktat laden</button>
+                </form>
+            </div>
+            
+            <!-- Diktat-Bereich (anfangs versteckt) -->
+            <div id="dictation-section" style="display: none;">
+                <h2 id="dictation-title">Titel des Diktats</h2>
+                
+                <!-- Audio-Status-Anzeige -->
+                <div class="audio-status" id="audio-status">Bereit für Sprachausgabe</div>
+                
+                <!-- Audio-Steuerung - einfache Buttons -->
+                <div class="audio-controls">
+                    <button id="play-button">Ganzes Diktat abspielen</button>
+                </div>
+                
+                <!-- Satz-Navigation -->
+                <div class="navigation-controls">
+                    <button id="section1-button">1</button>
+                    <button id="section2-button">2</button>
+                    <button id="section3-button">3</button>
+                </div>
+                
+                <!-- Diktat-Eingabe -->
+                <form id="dictation-form">
+                    <label for="dictation-input">Schreibe das gehörte Diktat:</label>
+                    <textarea id="dictation-input" placeholder="Tippe hier, was du hörst..." required></textarea>
+                    <button type="submit">Überprüfen</button>
+                </form>
+            </div>
+            
+            <!-- Ergebnisbereich (anfangs versteckt) -->
+            <div id="result-section" style="display: none;">
+                <h2>Ergebnis der Überprüfung</h2>
+                
+                <div class="result-summary">
+                    <p>Deine Bewertung:</p>
+                    <div class="score" id="result-score">0/10 Punkte</div>
+                    <div class="percent" id="result-percent">0% richtig</div>
+                </div>
+                
+                <pre id="result-text">Hier erscheint das Ergebnis...</pre>
+                <button id="new-dictation">Weiteres Diktat eingeben</button>
+            </div>
+            
+            <!-- Link zurück zur Startseite -->
+            <a href="/" class="home-link">← Zurück zur Startseite</a>
+        </div>
+        
+        <!-- Rechter Bereich mit Bild -->
+        <div class="image-section">
+            <img src="{{ url_for('static', filename='Bebo.png') }}" alt="BeBo Bot">
+        </div>
+    </div>
+    
+    <script>
+        // DOM-Elemente
+        const idForm = document.getElementById('id-form');
+        const dictationIdInput = document.getElementById('dictation-id');
+        const studentNameInput = document.getElementById('student-name');
+        const idInputSection = document.getElementById('id-input-section');
+        const dictationSection = document.getElementById('dictation-section');
+        const dictationTitle = document.getElementById('dictation-title');
+        const playButton = document.getElementById('play-button');
+        const section1Button = document.getElementById('section1-button');
+        const section2Button = document.getElementById('section2-button');
+        const section3Button = document.getElementById('section3-button');
+        const dictationForm = document.getElementById('dictation-form');
+        const dictationInput = document.getElementById('dictation-input');
+        const resultSection = document.getElementById('result-section');
+        const resultText = document.getElementById('result-text');
+        const resultScore = document.getElementById('result-score');
+        const resultPercent = document.getElementById('result-percent');
+        const newDictationButton = document.getElementById('new-dictation');
+        const audioStatus = document.getElementById('audio-status');
+        
+        // Globale Variablen für das Diktat
+        let currentDictationId = null;
+        let dictationSpeed = 1.0;
+        let studentName = '';
+        let sections = [];
+        
+        // Funktion zum Aufrufen der Eleven Labs API über Backend-Proxy
+        async function speakWithElevenLabs(text, voiceId = "NLdsrIcUBS4NcgKkzSzj") { // Nicole (Deutsch)
+            try {
+                // Status aktualisieren
+                if (audioStatus) {
+                    audioStatus.textContent = "Eleven Labs API wird angerufen...";
+                }
+                
+                // Unseren Backend-Proxy statt direkt die Eleven Labs API aufrufen
+                const response = await fetch('/elevenlabs_tts', {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        voice_id: voiceId
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => null);
+                    throw new Error(`Eleven Labs API error: ${response.status} ${errorData ? JSON.stringify(errorData) : ''}`);
+                }
+
+                // Audio-Daten als arrayBuffer erhalten
+                const audioData = await response.arrayBuffer();
+                
+                // Blob und URL für das Audio erstellen
+                const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Audio-Element erstellen und abspielen
+                const audioElement = new Audio(audioUrl);
+                
+                // Event-Listener hinzufügen
+                audioElement.onplay = () => {
+                    console.log("Eleven Labs audio started playing");
+                    if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (Eleven Labs)...";
+                };
+                
+                audioElement.onended = () => {
+                    console.log("Eleven Labs audio finished playing");
+                    if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
+                    // URL-Objekt freigeben
+                    URL.revokeObjectURL(audioUrl);
+                };
+                
+                audioElement.onerror = (e) => {
+                    console.error("Error playing Eleven Labs audio:", e);
+                    if (audioStatus) audioStatus.textContent = "Fehler bei der Wiedergabe: " + e.message;
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+                // Audio-Element in einer globalen Variable speichern für potenzielle Stornierung
+                window.currentAudioElement = audioElement;
+                
+                // Audio abspielen
+                audioElement.play();
+                
+                return true; // Erfolg
+            } catch (error) {
+                console.error("Eleven Labs API error:", error);
+                if (audioStatus) audioStatus.textContent = "Eleven Labs API Fehler: " + error.message;
+                return false; // Fehlgeschlagen
+            }
+        }
+        
+        // Prüfen ob Sprache unterstützt wird
+        function checkVoiceSupport() {
+            // Prüfen ob ResponsiveVoice verfügbar ist
+            if (typeof responsiveVoice === 'undefined') {
+                return false;
+            }
+            
+            // Prüfen ob Web Speech API verfügbar ist
+            if (!('speechSynthesis' in window)) {
+                return false;
+            }
+            
+            return true;
+        }
+
+        // Funktion, um die beste verfügbare deutsche Stimme zu ermitteln
+        function getBestGermanVoice() {
+            // Prioritätsreihenfolge für deutsche Stimmen
+            const germanVoicePriority = [
+                "Deutsch Male", 
+                "Deutsch Female",
+                "German Male",
+                "German Female"
+            ];
+            
+            // Verfügbare Stimmen prüfen
+            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.getVoices) {
+                const availableVoices = responsiveVoice.getVoices().map(v => v.name);
+                
+                // Die erste verfügbare deutsche Stimme in der Prioritätsreihenfolge verwenden
+                for (const voice of germanVoicePriority) {
+                    if (availableVoices.includes(voice)) {
+                        console.log(`Verwende deutsche Stimme: ${voice}`);
+                        return voice;
+                    }
+                }
+            }
+            
+            // Fallback zur Standard-deutschen Stimme
+            return "Deutsch Male";
+        }
+        
+        // Verbesserte speakText-Funktion, die zuerst Eleven Labs versucht
+        async function speakText(text, rate) {
+            // Aktuelle Audio-Wiedergabe abbrechen
+            if (window.currentAudioElement) {
+                window.currentAudioElement.pause();
+                window.currentAudioElement = null;
+            }
+            
+            // ResponsiveVoice abbrechen, falls es spielt
+            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
+            }
+            
+            // Web Speech API stoppen
+            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+            }
+            
             // Status aktualisieren
             if (audioStatus) {
-                audioStatus.textContent = "Eleven Labs API wird angerufen...";
+                audioStatus.textContent = "Sprachausgabe wird vorbereitet...";
             }
             
-            // Unseren Backend-Proxy statt direkt die Eleven Labs API aufrufen
-            const response = await fetch('/elevenlabs_tts', {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    text: text,
-                    voice_id: voiceId
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(`Eleven Labs API error: ${response.status} ${errorData ? JSON.stringify(errorData) : ''}`);
+            // Für deutschen Text eine deutsche Stimme-ID verwenden
+            // Nicole - deutsche Stimme
+            const germanVoiceId = "NLdsrIcUBS4NcgKkzSzj";
+            
+            // Zuerst Eleven Labs versuchen
+            const elevenLabsSuccess = await speakWithElevenLabs(text, germanVoiceId);
+            
+            // Wenn Eleven Labs fehlschlägt, auf ResponsiveVoice zurückfallen
+            if (!elevenLabsSuccess) {
+                console.log("Falling back to ResponsiveVoice");
+                if (audioStatus) audioStatus.textContent = "Eleven Labs fehlgeschlagen, verwende ResponsiveVoice...";
+                
+                // Prüfen, ob ResponsiveVoice verfügbar ist
+                if (typeof responsiveVoice === 'undefined') {
+                    console.error("ResponsiveVoice ist nicht verfügbar - Bibliothek nicht geladen");
+                    
+                    // Auf Web Speech API zurückfallen
+                    if ('speechSynthesis' in window) {
+                        if (audioStatus) audioStatus.textContent = "Verwende Browser-Sprachsynthese...";
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = 'de-DE';
+                        utterance.rate = rate;
+                        
+                        utterance.onstart = function() {
+                            if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (Browser)...";
+                        };
+                        
+                        utterance.onend = function() {
+                            if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
+                        };
+                        
+                        utterance.onerror = function(e) {
+                            if (audioStatus) audioStatus.textContent = "Fehler bei der Sprachausgabe: " + e.error;
+                        };
+                        
+                        window.speechSynthesis.speak(utterance);
+                        return;
+                    } else {
+                        if (audioStatus) audioStatus.textContent = "Fehler: Sprachausgabe nicht verfügbar. Bitte Seite neu laden.";
+                        return;
+                    }
+                }
+                
+                // Sicherstellen, dass ResponsiveVoice initialisiert ist
+                if (!responsiveVoice.isInitialised()) {
+                    console.log("ResponsiveVoice wird initialisiert...");
+                    responsiveVoice.init();
+                }
+                
+                // Voice-Optionen
+                const voiceOptions = {
+                    rate: rate || 1.0,
+                    pitch: 1,
+                    volume: 1,
+                    onstart: function() {
+                        console.log("ResponsiveVoice gestartet");
+                        if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (ResponsiveVoice)...";
+                    },
+                    onend: function() {
+                        console.log("ResponsiveVoice beendet");
+                        if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
+                    },
+                    onerror: function(e) {
+                        console.error("ResponsiveVoice Fehler:", e);
+                        if (audioStatus) audioStatus.textContent = "ResponsiveVoice Fehler: " + e;
+                    }
+                };
+                
+                // Die beste verfügbare deutsche Stimme verwenden
+                const bestVoice = getBestGermanVoice();
+                responsiveVoice.speak(text, bestVoice, voiceOptions);
             }
-
-            // Audio-Daten als arrayBuffer erhalten
-            const audioData = await response.arrayBuffer();
-            
-            // Blob und URL für das Audio erstellen
-            const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            
-            // Audio-Element erstellen und abspielen
-            const audioElement = new Audio(audioUrl);
-            
-            // Event-Listener hinzufügen
-            audioElement.onplay = () => {
-                console.log("Eleven Labs audio started playing");
-                if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (Eleven Labs)...";
-            };
-            
-            audioElement.onended = () => {
-                console.log("Eleven Labs audio finished playing");
-                if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
-                // URL-Objekt freigeben
-                URL.revokeObjectURL(audioUrl);
-            };
-            
-            audioElement.onerror = (e) => {
-                console.error("Error playing Eleven Labs audio:", e);
-                if (audioStatus) audioStatus.textContent = "Fehler bei der Wiedergabe: " + e.message;
-                URL.revokeObjectURL(audioUrl);
-            };
-
-            // Audio-Element in einer globalen Variable speichern für potenzielle Stornierung
-            window.currentAudioElement = audioElement;
-            
-            // Audio abspielen
-            audioElement.play();
-            
-            return true; // Erfolg
-        } catch (error) {
-            console.error("Eleven Labs API error:", error);
-            if (audioStatus) audioStatus.textContent = "Eleven Labs API Fehler: " + error.message;
-            return false; // Fehlgeschlagen
-        }
-    }
-
-    // Verbesserte speakText-Funktion, die zuerst Eleven Labs versucht
-    async function speakText(text, rate) {
-        // Aktuelle Audio-Wiedergabe abbrechen
-        if (window.currentAudioElement) {
-            window.currentAudioElement.pause();
-            window.currentAudioElement = null;
         }
         
-        // ResponsiveVoice abbrechen, falls es spielt
-        if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
-            responsiveVoice.cancel();
+        // Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
+        function replacePunctuationWithWords(text) {
+            return text
+                .replace(/\./g, ' Punkt ')
+                .replace(/,/g, ' Komma ')
+                .replace(/;/g, ' Semikolon ')
+                .replace(/:/g, ' Doppelpunkt ')
+                .replace(/\?/g, ' Fragezeichen ')
+                .replace(/!/g, ' Ausrufezeichen ')
+                .replace(/\(/g, ' Klammer auf ')
+                .replace(/\)/g, ' Klammer zu ')
+                .replace(/\"/g, ' Anführungszeichen ')
+                .replace(/\'/g, ' Apostroph ')
+                .replace(/-/g, ' Bindestrich ')
+                .replace(/\//g, ' Schrägstrich ')
+                .replace(/\s+/g, ' '); // Entfernt mehrfache Leerzeichen
         }
         
-        // Status aktualisieren
-        if (audioStatus) {
-            audioStatus.textContent = "Sprachausgabe wird vorbereitet...";
-        }
-        
-        // Für deutschen Text eine deutsche Stimme-ID verwenden
-        // Nicole - deutsche Stimme
-        const germanVoiceId = "NLdsrIcUBS4NcgKkzSzj";
-        
-        // Zuerst Eleven Labs versuchen
-        const elevenLabsSuccess = await speakWithElevenLabs(text, germanVoiceId);
-        
-        // Wenn Eleven Labs fehlschlägt, auf ResponsiveVoice zurückfallen
-        if (!elevenLabsSuccess) {
-            console.log("Falling back to ResponsiveVoice");
-            if (audioStatus) audioStatus.textContent = "Eleven Labs fehlgeschlagen, verwende ResponsiveVoice...";
+        // Diktat-ID laden
+        idForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            // Prüfen, ob ResponsiveVoice verfügbar ist
-            if (typeof responsiveVoice === 'undefined') {
-                console.error("ResponsiveVoice ist nicht verfügbar - Bibliothek nicht geladen");
-                if (audioStatus) audioStatus.textContent = "Fehler: Sprachausgabe nicht verfügbar. Bitte Seite neu laden.";
+            const dictationId = dictationIdInput.value.trim().toUpperCase();
+            studentName = studentNameInput.value.trim();
+            
+            if (!dictationId) {
+                alert('Bitte gib eine Diktat-ID ein!');
                 return;
             }
             
-            // Sicherstellen, dass ResponsiveVoice initialisiert ist
-            if (!responsiveVoice.isInitialised()) {
-                console.log("ResponsiveVoice wird initialisiert...");
-                responsiveVoice.init();
+            if (!studentName) {
+                alert('Bitte gib deinen Namen ein!');
+                return;
             }
             
-            // Voice-Optionen
-            const voiceOptions = {
-                rate: rate || 1.0,
-                pitch: 1,
-                volume: 1,
-                onstart: function() {
-                    console.log("ResponsiveVoice gestartet");
-                    if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (ResponsiveVoice)...";
-                },
-                onend: function() {
-                    console.log("ResponsiveVoice beendet");
-                    if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
-                },
-                onerror: function(e) {
-                    console.error("ResponsiveVoice Fehler:", e);
-                    if (audioStatus) audioStatus.textContent = "ResponsiveVoice Fehler: " + e;
+            try {
+                const response = await fetch(`/get_dictation/${dictationId}`);
+                if (!response.ok) {
+                    throw new Error('Diktat nicht gefunden');
                 }
-            };
-            
-            // Die beste verfügbare deutsche Stimme verwenden
-            const bestVoice = getBestGermanVoice();
-            responsiveVoice.speak(text, bestVoice, voiceOptions);
-        }
-    }
-
-    // Rest der Funktionen...
-</script>
-
-<!-- ResponsiveVoice Script korrekt vor dem schließenden </body> Tag platzieren -->
-<script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
-<script>
-    // Funktion, die nach dem Laden von ResponsiveVoice ausgeführt werden soll
-    if (typeof responsiveVoice !== 'undefined') {
-        console.log("ResponsiveVoice wurde geladen!");
+                
+                const dictation = await response.json();
+                
+                // Geschwindigkeit speichern
+                dictationSpeed = dictation.speed;
+                currentDictationId = dictationId;
+                
+                // UI aktualisieren
+                dictationTitle.textContent = dictation.title;
+                
+                // Diktat-Bereich anzeigen
+                idInputSection.style.display = 'none';
+                dictationSection.style.display = 'block';
+                resultSection.style.display = 'none';
+                
+                // Eingabefeld leeren
+                dictationInput.value = '';
+                
+                // Jetzt den Diktat-Text über den speziellen Audio-Endpunkt holen
+                try {
+                    const audioResponse = await fetch(`/get_dictation_audio/${dictationId}`);
+                    if (audioResponse.ok) {
+                        const audioData = await audioResponse.json();
+                        
+                        // Sprachausgabe vorbereiten
+                        prepareUtterance(audioData.text, audioData.speed);
+                    } else {
+                        // Fallback auf den alten Ansatz
+                        const fullDictationResponse = await fetch(`/get_full_dictation/${dictationId}`);
+                        if (fullDictationResponse.ok) {
+                            const fullDictation = await fullDictationResponse.json();
+                            prepareUtterance(fullDictation.text, dictation.speed);
+                        } else {
+                            console.error('Diktattext nicht geladen');
+                            if (audioStatus) audioStatus.textContent = "Fehler: Diktattext konnte nicht geladen werden";
+                        }
+                    }
+                } catch (audioError) {
+                    console.error('Fehler beim Laden des Diktattextes:', audioError);
+                    if (audioStatus) audioStatus.textContent = "Fehler: " + audioError.message;
+                }
+                
+            } catch (error) {
+                alert(`Fehler: ${error.message}. Bitte überprüfe die Diktat-ID.`);
+            }
+        });
         
-        // Audio-Kontext für Mobile entsperren beim ersten Laden
-        try {
-            if (responsiveVoice.clickEvent) {
-                responsiveVoice.clickEvent();
+        // Sprachausgabe vorbereiten
+        function prepareUtterance(text, speed) {
+            // Text für spätere Verwendung speichern
+            window.diktatFullText = text;
+            window.diktatSpeed = speed;
+            
+            // Text in 3 etwa gleich große Abschnitte teilen
+            const words = text.split(/\s+/);
+            const sectionSize = Math.ceil(words.length / 3);
+            
+            sections = [
+                words.slice(0, sectionSize).join(' '),
+                words.slice(sectionSize, sectionSize * 2).join(' '),
+                words.slice(sectionSize * 2).join(' ')
+            ];
+            
+            // Abschnitt-Buttons Beschriftung aktualisieren
+            section1Button.textContent = "1";
+            section2Button.textContent = "2";
+            section3Button.textContent = "3";
+            
+            // Status aktualisieren
+            if (audioStatus) {
+                audioStatus.textContent = "Diktat bereit. Klicke auf 'Abspielen' zum Starten.";
+            }
+        }
+        
+        // Ganzes Diktat abspielen
+        playButton.addEventListener('click', function() {
+            if (window.diktatFullText) {
+                // Text mit ausgesprochenen Satzzeichen vorbereiten
+                const textWithPunctuation = replacePunctuationWithWords(window.diktatFullText);
+                
+                // Text abspielen
+                speakText(textWithPunctuation, window.diktatSpeed);
+            } else {
+                if (audioStatus) audioStatus.textContent = "Fehler: Kein Diktattext vorhanden";
+            }
+        });
+        
+        // Abschnitt 1 abspielen
+        section1Button.addEventListener('click', function() {
+            if (sections.length > 0) {
+                const textWithPunctuation = replacePunctuationWithWords(sections[0]);
+                speakText(textWithPunctuation, window.diktatSpeed);
+            }
+        });
+        
+        // Abschnitt 2 abspielen
+        section2Button.addEventListener('click', function() {
+            if (sections.length > 1) {
+                const textWithPunctuation = replacePunctuationWithWords(sections[1]);
+                speakText(textWithPunctuation, window.diktatSpeed);
+            }
+        });
+        
+        // Abschnitt 3 abspielen
+        section3Button.addEventListener('click', function() {
+            if (sections.length > 2) {
+                const textWithPunctuation = replacePunctuationWithWords(sections[2]);
+                speakText(textWithPunctuation, window.diktatSpeed);
+            }
+        });
+        
+        // Diktat überprüfen
+        dictationForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const userText = dictationInput.value.trim();
+            
+            if (!userText) {
+                alert('Bitte gib deinen Text ein!');
+                return;
             }
             
-            // Verfügbare Stimmen anzeigen
-            if (responsiveVoice.getVoices) {
-                console.log("Verfügbare Stimmen beim Laden:", responsiveVoice.getVoices().map(v => v.name));
+            try {
+                const formData = new FormData();
+                formData.append('dictation_id', currentDictationId);
+                formData.append('user_text', userText);
+                formData.append('student_name', studentName);
+                
+                // Button-Status aktualisieren
+                const submitButton = this.querySelector('button[type="submit"]');
+                submitButton.textContent = 'Wird überprüft...';
+                submitButton.disabled = true;
+                
+                const response = await fetch('/check_dictation', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Fehler bei der Überprüfung');
+                }
+                
+                const result = await response.json();
+                
+                // Ergebnis anzeigen
+                resultText.textContent = result.result;
+                resultScore.textContent = `${result.score.toFixed(1)}/10 Punkte`;
+                resultPercent.textContent = `${result.percent.toFixed(1)}% richtig`;
+                
+                // UI-Wechsel
+                dictationSection.style.display = 'none';
+                resultSection.style.display = 'block';
+                
+                // Audio pausieren
+                if (window.currentAudioElement) {
+                    window.currentAudioElement.pause();
+                    window.currentAudioElement = null;
+                }
+                
+                if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
+                    responsiveVoice.cancel();
+                }
+                
+                if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+                    window.speechSynthesis.cancel();
+                }
+                
+                // Button-Status zurücksetzen
+                submitButton.textContent = 'Überprüfen';
+                submitButton.disabled = false;
+                
+            } catch (error) {
+                alert(`Fehler: ${error.message}`);
+                const submitButton = this.querySelector('button[type="submit"]');
+                submitButton.textContent = 'Überprüfen';
+                submitButton.disabled = false;
             }
-        } catch (e) {
-            console.error("Fehler beim initialen ResponsiveVoice Setup:", e);
+        });
+        
+        // Neues Diktat eingeben
+        newDictationButton.addEventListener('click', function() {
+            // Zurück zur ID-Eingabe
+            idInputSection.style.display = 'block';
+            dictationSection.style.display = 'none';
+            resultSection.style.display = 'none';
+            
+            // Felder zurücksetzen
+            dictationIdInput.value = '';
+            dictationInput.value = '';
+            
+            // Audio zurücksetzen
+            if (window.currentAudioElement) {
+                window.currentAudioElement.pause();
+                window.currentAudioElement = null;
+            }
+            
+            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
+                responsiveVoice.cancel();
+            }
+            
+            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+            }
+            
+            window.diktatFullText = null;
+            currentDictationId = null;
+            sections = [];
+            
+            if (audioStatus) {
+                audioStatus.textContent = "Bereit für Sprachausgabe";
+            }
+        });
+    </script>
+    
+    <!-- ResponsiveVoice Script -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
+    <script>
+        // Funktion, die nach dem Laden von ResponsiveVoice ausgeführt werden soll
+        if (typeof responsiveVoice !== 'undefined') {
+            console.log("ResponsiveVoice wurde geladen!");
+            
+            // Audio-Kontext für Mobile entsperren beim ersten Laden
+            try {
+                if (responsiveVoice.clickEvent) {
+                    responsiveVoice.clickEvent();
+                }
+                
+                // Verfügbare Stimmen anzeigen
+                if (responsiveVoice.getVoices) {
+                    console.log("Verfügbare Stimmen beim Laden:", responsiveVoice.getVoices().map(v => v.name));
+                }
+            } catch (e) {
+                console.error("Fehler beim initialen ResponsiveVoice Setup:", e);
+            }
         }
-    }
-</script>
+    </script>
+</body>
+</html>
