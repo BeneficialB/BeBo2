@@ -14,7 +14,8 @@ load_dotenv()
 
 # API-Schlüssel
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
-ELEVEN_LABS_API_KEY = os.getenv("ELEVEN_LABS_API_KEY")
+# Wenn die Umgebungsvariable nicht gesetzt ist, verwende den neuen Schlüssel direkt
+ELEVEN_LABS_API_KEY = os.getenv("ELEVEN_LABS_API_KEY", "sk_fc59a3da708a2e13a604edf681925c4567ef4613f3a07a9d")
 
 # Passwort für den Lehrerbereich
 TEACHER_PASSWORD = "Hamburg1!"
@@ -181,12 +182,16 @@ def validate_eleven_key():
                 voices = [{"voice_id": v["voice_id"], "name": v["name"]} 
                          for v in voices_data.get("voices", [])]
                 
+                # Prüfen, ob unsere Julia-Stimme verfügbar ist
+                julia_available = any(v["voice_id"] == GERMAN_VOICE_ID for v in voices)
+                
                 # Detaillierte API-Informationen zurückgeben
                 return jsonify({
                     "valid": True,
                     "subscription": subscription_data,
                     "voices_count": len(voices),
                     "voices": voices,
+                    "julia_available": julia_available,
                     "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
                 })
             else:
@@ -341,6 +346,7 @@ def elevenlabs_tts():
         }
         
         print(f"Sende Anfrage an Eleven Labs API mit Stimme: {voice_id}")
+        print(f"API-Schlüssel (erste 5 Zeichen): {ELEVEN_LABS_API_KEY[:5]}...")
         
         response = requests.post(
             api_url,
