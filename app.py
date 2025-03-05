@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, Response
 import anthropic
 import os
 import random
 import string
 import json
+import requests
 from datetime import datetime
 from functools import wraps
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ load_dotenv()
 
 # API-Schlüssel
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+ELEVEN_LABS_API_KEY = os.getenv("ELEVEN_LABS_API_KEY")
 
 # Passwort für den Lehrerbereich
 TEACHER_PASSWORD = "Hamburg1!"
@@ -170,6 +172,57 @@ def get_dictation_audio(dictation_id):
         "text": dictations[dictation_id]["text"],
         "speed": dictations[dictation_id]["speed"]
     })
+
+@app.route("/elevenlabs_tts", methods=["POST"])
+def elevenlabs_tts():
+    """Proxy für die Eleven Labs API, um den API-Schlüssel zu schützen."""
+    # API-Schlüssel aus Umgebungsvariablen laden
+    if not ELEVEN_LABS_API_KEY:
+        return jsonify({"error": "Eleven Labs API-Schlüssel nicht konfiguriert."}), 500
+
+    # Daten aus der Anfrage holen
+    data = request.json
+    text = data.get("text")
+    voice_id = data.get("voice_id", "NLdsrIcUBS4NcgKkzSzj")  # Nicole (Deutsch)
+    
+    if not text:
+        return jsonify({"error": "Kein Text angegeben."}), 400
+
+    try:
+        # Eleven Labs API aufrufen
+        api_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        
+        response = requests.post(
+            api_url,
+            headers={
+                "Content-Type": "application/json",
+                "xi-api-key": ELEVEN_LABS_API_KEY
+            },
+            json={
+                "text": text,
+                "model_id": "eleven_multilingual_v2",
+                "voice_settings": {
+                    "stability": 0.5,
+                    "similarity_boost": 0.75,
+                    "style": 0.0,
+                    "use_speaker_boost": True
+                }
+            }
+        )
+        
+        # Antwort überprüfen
+        if not response.ok:
+            return jsonify({"error": f"Eleven Labs API-Fehler: {response.status_code}"}), response.status_code
+        
+        # Audio-Daten zurückgeben
+        return Response(
+            response.content,
+            mimetype="audio/mpeg",
+            headers={"Cache-Control": "no-cache"}
+        )
+        
+    except Exception as e:
+        return jsonify({"error": f"Fehler bei der Eleven Labs API: {str(e)}"}), 500
 
 @app.route("/get_dictations")
 @teacher_login_required
