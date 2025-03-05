@@ -34,10 +34,8 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "diktate-sind-cool-aber-geheim")
 dictations = {}
 results = []  # Hier werden die Schülerergebnisse gespeichert
 
-# Deutsche Stimmen für die TTS (Aria sollte multilingual sein)
-GERMAN_VOICE_ID = "9BWtsMINqrJLrRacOk9x"  # Aria
-# Fallback Stimmen, falls Aria nicht funktioniert
-FALLBACK_VOICE_IDS = ["EXAVITQu4vr4xnSDxMaL", "CwhRBWXzGAHq8TQ4Fs17"]
+# Deutsche Stimme für die TTS - Julia
+GERMAN_VOICE_ID = "5XpnZmJA35ZNSAZfsjaz"  # Julia (deutsche Stimme)
 
 # Hilfsfunktion für Diktat-ID-Generierung
 def generate_dictation_id(length=6):
@@ -97,56 +95,123 @@ def env_check():
         "ELEVEN_LABS_API_KEY": ELEVEN_LABS_API_KEY is not None,
         "ELEVEN_LABS_KEY_LENGTH": len(ELEVEN_LABS_API_KEY) if ELEVEN_LABS_API_KEY else 0,
         "ELEVEN_LABS_KEY_START": ELEVEN_LABS_API_KEY[:5] + "..." if ELEVEN_LABS_API_KEY else "None",
-        "CLAUDE_API_KEY": CLAUDE_API_KEY is not None
+        "CLAUDE_API_KEY": CLAUDE_API_KEY is not None,
+        "GERMAN_VOICE_ID": GERMAN_VOICE_ID
     }
     return jsonify(env_vars)
 
 @app.route("/elevenlabs_test")
 def elevenlabs_test():
-    """Einfacher Test für die Eleven Labs API"""
+    """Einfacher Test für die Eleven Labs API mit Julia-Stimme"""
     if not ELEVEN_LABS_API_KEY:
         return jsonify({
             "success": False,
             "error": "Eleven Labs API-Schlüssel nicht gefunden!"
         })
     
-    test_text = "Hallo, das ist ein Testtext für die Sprachausgabe."
+    test_text = "Hallo, ich bin Julia. Ich helfe dir bei deinem Diktat."
     
     try:
-        # Eleven Labs API aufrufen, um verfügbare Stimmen zu holen
-        api_url = "https://api.elevenlabs.io/v1/voices"
+        # Eleven Labs API aufrufen
+        api_url = f"https://api.elevenlabs.io/v1/text-to-speech/{GERMAN_VOICE_ID}"
         
-        response = requests.get(
+        response = requests.post(
             api_url,
             headers={
+                "Content-Type": "application/json",
                 "xi-api-key": ELEVEN_LABS_API_KEY
+            },
+            json={
+                "text": test_text,
+                "model_id": "eleven_multilingual_v2"
             }
         )
         
         if response.ok:
-            voice_data = response.json()
-            voices = [{"voice_id": v["voice_id"], "name": v["name"]} for v in voice_data.get("voices", [])]
-            return jsonify({
-                "status": "success",
-                "message": "Erfolgreich mit Eleven Labs API verbunden",
-                "key_found": True,
-                "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "...",
-                "voices_count": len(voices),
-                "voices": voices[:3]  # Nur die ersten 3 Stimmen anzeigen
-            })
+            return Response(
+                response.content,
+                mimetype="audio/mpeg",
+                headers={"Cache-Control": "no-cache"}
+            )
         else:
             return jsonify({
-                "status": "error",
-                "message": f"Fehler bei der Verbindung zur Eleven Labs API: {response.status_code}",
-                "key_found": True,
-                "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "...",
-                "response": response.text
+                "success": False,
+                "status_code": response.status_code,
+                "error": response.text
             })
     
     except Exception as e:
         return jsonify({
             "success": False,
             "error": str(e)
+        })
+
+@app.route("/validate_eleven_key")
+def validate_eleven_key():
+    """Überprüft, ob der Eleven Labs API-Schlüssel korrekt funktioniert"""
+    print("=== ELEVEN LABS TOKEN CHECK ===")
+    
+    if not ELEVEN_LABS_API_KEY:
+        return jsonify({
+            "valid": False,
+            "error": "API-Schlüssel nicht konfiguriert"
+        })
+    
+    try:
+        # Einfachen API-Aufruf machen, um die Gültigkeit zu prüfen
+        response = requests.get(
+            "https://api.elevenlabs.io/v1/user/subscription",
+            headers={"xi-api-key": ELEVEN_LABS_API_KEY}
+        )
+        
+        print(f"Subscription API Status Code: {response.status_code}")
+        
+        if response.ok:
+            subscription_data = response.json()
+            print(f"Subscription Daten: {json.dumps(subscription_data)}")
+            
+            # Stimmen abrufen
+            voices_response = requests.get(
+                "https://api.elevenlabs.io/v1/voices",
+                headers={"xi-api-key": ELEVEN_LABS_API_KEY}
+            )
+            
+            if voices_response.ok:
+                voices_data = voices_response.json()
+                voices = [{"voice_id": v["voice_id"], "name": v["name"]} 
+                         for v in voices_data.get("voices", [])]
+                
+                # Detaillierte API-Informationen zurückgeben
+                return jsonify({
+                    "valid": True,
+                    "subscription": subscription_data,
+                    "voices_count": len(voices),
+                    "voices": voices,
+                    "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
+                })
+            else:
+                print(f"Fehler beim Abrufen der Stimmen: {voices_response.status_code}")
+                print(f"Antwort: {voices_response.text}")
+                return jsonify({
+                    "valid": False, 
+                    "error": f"Stimmen-API-Fehler: {voices_response.status_code}",
+                    "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
+                })
+        else:
+            print(f"Fehlerantwort: {response.text}")
+            return jsonify({
+                "valid": False,
+                "error": f"API-Schlüssel ungültig oder abgelaufen: {response.status_code}",
+                "details": response.text,
+                "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
+            })
+    
+    except Exception as e:
+        print(f"Ausnahme bei der API-Validierung: {str(e)}")
+        return jsonify({
+            "valid": False,
+            "error": str(e),
+            "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
         })
 
 @app.route("/create_dictation", methods=["POST"])
@@ -248,13 +313,13 @@ def elevenlabs_tts():
     # Daten aus der Anfrage holen
     try:
         data = request.json
-        print(f"Received request data for TTS")
+        print(f"Received request for TTS")
     except Exception as e:
         print(f"Error parsing request data: {e}")
         return jsonify({"error": "Ungültige JSON-Daten"}), 400
     
     text = data.get("text")
-    # Standardmäßig die deutsche Stimme "Aria" verwenden
+    # Standardmäßig die Julia-Stimme verwenden
     voice_id = data.get("voice_id", GERMAN_VOICE_ID)
     
     if not text:
@@ -297,31 +362,6 @@ def elevenlabs_tts():
                 error_msg += f" - {json.dumps(error_json)}"
             except:
                 error_msg += f" - {response.text}"
-            
-            # Fallback auf andere Stimme versuchen, wenn die aktuelle nicht funktioniert
-            if response.status_code == 400 or response.status_code == 404:
-                for fallback_voice in FALLBACK_VOICE_IDS:
-                    try:
-                        print(f"Versuche Fallback-Stimme: {fallback_voice}")
-                        fallback_url = f"https://api.elevenlabs.io/v1/text-to-speech/{fallback_voice}"
-                        fallback_response = requests.post(
-                            fallback_url,
-                            headers={
-                                "Content-Type": "application/json",
-                                "xi-api-key": ELEVEN_LABS_API_KEY
-                            },
-                            json=payload
-                        )
-                        
-                        if fallback_response.ok:
-                            print(f"Fallback auf Stimme {fallback_voice} erfolgreich!")
-                            return Response(
-                                fallback_response.content,
-                                mimetype="audio/mpeg",
-                                headers={"Cache-Control": "no-cache"}
-                            )
-                    except Exception as fe:
-                        print(f"Fehler beim Fallback auf Stimme {fallback_voice}: {str(fe)}")
             
             print(error_msg)
             return jsonify({"error": error_msg}), response.status_code
