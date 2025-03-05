@@ -301,6 +301,12 @@
                     
                     <button type="submit">Diktat laden</button>
                 </form>
+                
+                <!-- Test-Button für Entwicklung (bei Bedarf einschalten) -->
+                <button id="test-tts-button" type="button" 
+                  style="background-color: #00ccff; margin-top: 10px;">
+                  Sprachausgabe testen
+                </button>
             </div>
             
             <!-- Diktat-Bereich (anfangs versteckt) -->
@@ -374,6 +380,7 @@
         const resultPercent = document.getElementById('result-percent');
         const newDictationButton = document.getElementById('new-dictation');
         const audioStatus = document.getElementById('audio-status');
+        const testTtsButton = document.getElementById('test-tts-button');
         
         // Globale Variablen für das Diktat
         let currentDictationId = null;
@@ -381,8 +388,88 @@
         let studentName = '';
         let sections = [];
         
-        // Deutsche Stimme (Aria von Eleven Labs)
-        const GERMAN_VOICE_ID = "9BWtsMINqrJLrRacOk9x";
+        // Deutsche Stimme - Julia
+        const GERMAN_VOICE_ID = "5XpnZmJA35ZNSAZfsjaz";
+        
+        // Test-Funktion für Text-to-Speech
+        async function testTTS() {
+            try {
+                if (audioStatus) {
+                    audioStatus.textContent = "Teste Eleven Labs API...";
+                }
+                
+                // Test-Text senden
+                const response = await fetch('/elevenlabs_tts', {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        text: "Hallo! Ich bin Julia. Ich helfe dir bei deinem Diktat.",
+                        voice_id: GERMAN_VOICE_ID
+                    })
+                });
+
+                if (!response.ok) {
+                    let errorText = `HTTP ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        console.error("Error response:", errorData);
+                        errorText += `: ${JSON.stringify(errorData)}`;
+                    } catch (e) {
+                        errorText += `: ${await response.text() || "Keine Fehlerdetails verfügbar"}`;
+                    }
+                    throw new Error(errorText);
+                }
+
+                // Audio-Daten als arrayBuffer erhalten
+                const audioData = await response.arrayBuffer();
+                
+                // Blob und URL für das Audio erstellen
+                const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Audio-Element erstellen und abspielen
+                const audioElement = new Audio(audioUrl);
+                
+                audioElement.onplay = () => {
+                    console.log("Test audio started playing");
+                    if (audioStatus) audioStatus.textContent = "Test-Audio wird abgespielt...";
+                };
+                
+                audioElement.onended = () => {
+                    console.log("Test audio finished playing");
+                    if (audioStatus) audioStatus.textContent = "Test-Audio abgeschlossen.";
+                    URL.revokeObjectURL(audioUrl);
+                };
+                
+                audioElement.onerror = (e) => {
+                    console.error("Error playing test audio:", e);
+                    if (audioStatus) audioStatus.textContent = "Fehler bei der Wiedergabe: " + (e.message || "Unbekannter Fehler");
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+                // Audio abspielen
+                try {
+                    await audioElement.play();
+                } catch (e) {
+                    console.error("Error playing audio:", e);
+                    if (audioStatus) audioStatus.textContent = "Fehler beim Abspielen des Audios. Tippen Sie auf den Bildschirm und versuchen Sie es erneut.";
+                }
+                
+                console.log("Test TTS erfolgreich");
+                return true;
+            } catch (error) {
+                console.error("Test TTS fehlgeschlagen:", error);
+                if (audioStatus) audioStatus.textContent = "Test fehlgeschlagen: " + error.message;
+                return false;
+            }
+        }
+        
+        // Test-Button mit der Test-Funktion verbinden
+        if (testTtsButton) {
+            testTtsButton.addEventListener('click', testTTS);
+        }
         
         // Funktion zum Aufrufen der Eleven Labs API über Backend-Proxy
         async function speakWithElevenLabs(text, voiceId = GERMAN_VOICE_ID) {
