@@ -69,7 +69,7 @@ def replace_punctuation_with_words(text):
 # Funktion zur Generierung von Audio mit Elevenlabs
 def generate_audio_with_elevenlabs(text, speed=1.0):
     """Generiert eine Audiodatei mit Elevenlabs TTS."""
-    url = "https://api.elevenlabs.io/v1/text-to-speech/ThT5KcBeYPX3keUQqHPh"  # Voice ID für "Daniel" (deutsche Stimme)
+    url = "https://api.elevenlabs.io/v1/text-to-speech/7FV4sINSphYVJMO4nIxc"  # Voice ID für "Bennet"
     
     # Text mit ausgesprochenen Satzzeichen
     text_with_spoken_punctuation = replace_punctuation_with_words(text)
