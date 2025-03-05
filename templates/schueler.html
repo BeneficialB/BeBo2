@@ -114,37 +114,26 @@
             100% { box-shadow: 0 0 5px #ff9900; }
         }
 
-        /* Audio-Player und Kontrollbereich */
-        .audio-controls {
-            display: flex;
-            gap: 10px;
-            margin: 10px 0;
-            flex-direction: column;
-        }
-
+        /* Audio-Player */
         .audio-player {
             width: 100%;
             background-color: #222222;
             border-radius: 5px;
             border: 2px solid #ff9900;
-            padding: 10px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .audio-player h3 {
+            color: #ffcc00;
+            margin-top: 0;
             margin-bottom: 10px;
+            font-size: 14px;
         }
 
         audio {
             width: 100%;
-        }
-
-        .section-buttons {
-            display: flex;
-            gap: 10px;
-            margin: 10px 0;
-        }
-
-        .section-button {
-            flex: 1;
-            font-size: 12px;
-            padding: 10px;
+            margin-top: 5px;
         }
 
         /* Diktat-Eingabe */
@@ -250,17 +239,6 @@
                 padding-right: 0;
                 width: 100%;
             }
-
-            .section-buttons {
-                flex-direction: row;
-            }
-            
-            .section-buttons button {
-                flex: 0 1 auto;
-                width: 30%;
-                font-size: 11px;
-                padding: 6px;
-            }
             
             .image-section {
                 margin-top: 20px;
@@ -303,20 +281,12 @@
                 <h2 id="dictation-title">Titel des Diktats</h2>
                 
                 <!-- Audio-Player -->
-                <div class="audio-controls">
-                    <div class="audio-player">
-                        <h3>Ganzes Diktat:</h3>
-                        <audio id="full-audio-player" controls>
-                            <source src="" type="audio/mpeg">
-                            Dein Browser unterstützt keine Audio-Wiedergabe.
-                        </audio>
-                    </div>
-                    
-                    <div class="section-buttons">
-                        <button id="section1-button" class="section-button">Abschnitt 1</button>
-                        <button id="section2-button" class="section-button">Abschnitt 2</button>
-                        <button id="section3-button" class="section-button">Abschnitt 3</button>
-                    </div>
+                <div class="audio-player">
+                    <h3>Höre dir das Diktat an und schreibe den Text auf:</h3>
+                    <audio id="audio-player" controls>
+                        <source src="" type="audio/mpeg">
+                        Dein Browser unterstützt keine Audio-Wiedergabe.
+                    </audio>
                 </div>
                 
                 <!-- Diktat-Eingabe -->
@@ -359,10 +329,7 @@
         const idInputSection = document.getElementById('id-input-section');
         const dictationSection = document.getElementById('dictation-section');
         const dictationTitle = document.getElementById('dictation-title');
-        const fullAudioPlayer = document.getElementById('full-audio-player');
-        const section1Button = document.getElementById('section1-button');
-        const section2Button = document.getElementById('section2-button');
-        const section3Button = document.getElementById('section3-button');
+        const audioPlayer = document.getElementById('audio-player');
         const dictationForm = document.getElementById('dictation-form');
         const dictationInput = document.getElementById('dictation-input');
         const resultSection = document.getElementById('result-section');
@@ -374,7 +341,6 @@
         // Globale Variablen für das Diktat
         let currentDictationId = null;
         let studentName = '';
-        let sectionAudioPlayers = [];
         
         // Diktat-ID laden
         idForm.addEventListener('submit', async function(e) {
@@ -409,12 +375,9 @@
                 
                 // Audio-Player einrichten
                 if (dictation.audio_file) {
-                    fullAudioPlayer.src = `/audio/${dictation.audio_file}`;
-                    fullAudioPlayer.load();
+                    audioPlayer.src = `/audio/${dictation.audio_file}`;
+                    audioPlayer.load();
                 }
-                
-                // Abschnitts-Buttons einrichten
-                setupSectionButtons(dictation.section_audio_files);
                 
                 // Diktat-Bereich anzeigen
                 idInputSection.style.display = 'none';
@@ -428,53 +391,6 @@
                 alert(`Fehler: ${error.message}. Bitte überprüfe die Diktat-ID.`);
             }
         });
-        
-        // Abschnitts-Buttons einrichten
-        function setupSectionButtons(sectionFiles) {
-            // Audio-Player für Abschnitte erstellen
-            sectionAudioPlayers = [];
-            
-            // Wenn keine Abschnittsdateien verfügbar sind, Buttons deaktivieren
-            if (!sectionFiles || sectionFiles.length === 0) {
-                section1Button.disabled = true;
-                section2Button.disabled = true;
-                section3Button.disabled = true;
-                return;
-            }
-            
-            // Jeden Button mit dem entsprechenden Abschnitt verknüpfen
-            for (let i = 0; i < Math.min(3, sectionFiles.length); i++) {
-                const audioPlayer = new Audio(`/audio/${sectionFiles[i]}`);
-                sectionAudioPlayers.push(audioPlayer);
-                
-                const sectionButton = document.getElementById(`section${i+1}-button`);
-                sectionButton.disabled = false;
-                
-                // Event-Listener für Abschnitts-Button
-                sectionButton.addEventListener('click', (function(index) {
-                    return function() {
-                        // Alle anderen Audio-Player pausieren
-                        fullAudioPlayer.pause();
-                        sectionAudioPlayers.forEach((player, idx) => {
-                            if (idx !== index) player.pause();
-                        });
-                        
-                        // Diesen Abschnitt abspielen oder pausieren
-                        const player = sectionAudioPlayers[index];
-                        if (player.paused) {
-                            player.play();
-                        } else {
-                            player.pause();
-                        }
-                    };
-                })(i));
-            }
-            
-            // Verbleibende Buttons deaktivieren, falls weniger als 3 Abschnitte
-            for (let i = sectionFiles.length; i < 3; i++) {
-                document.getElementById(`section${i+1}-button`).disabled = true;
-            }
-        }
         
         // Diktat überprüfen
         dictationForm.addEventListener('submit', async function(e) {
@@ -519,8 +435,7 @@
                 resultSection.style.display = 'block';
                 
                 // Audio pausieren
-                fullAudioPlayer.pause();
-                sectionAudioPlayers.forEach(player => player.pause());
+                audioPlayer.pause();
                 
                 // Button-Status zurücksetzen
                 submitButton.textContent = 'Überprüfen';
@@ -546,19 +461,12 @@
             dictationInput.value = '';
             
             // Audio pausieren
-            fullAudioPlayer.pause();
-            sectionAudioPlayers.forEach(player => player.pause());
+            audioPlayer.pause();
             
-            // Audio-Objekte zurücksetzen
-            fullAudioPlayer.src = '';
-            sectionAudioPlayers = [];
+            // Audio-Quelle zurücksetzen
+            audioPlayer.src = '';
             
             currentDictationId = null;
-        });
-        
-        // Der vollständige Audio-Player soll alle anderen pausieren, wenn er abgespielt wird
-        fullAudioPlayer.addEventListener('play', function() {
-            sectionAudioPlayers.forEach(player => player.pause());
         });
     </script>
 </body>
