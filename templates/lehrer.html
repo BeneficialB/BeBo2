@@ -327,15 +327,25 @@
             background-color: #ff3333;
         }
 
-        /* Audio-Status-Anzeige */
-        .audio-status {
+        /* Audio-Player Stil */
+        .audio-player {
             background: #222222;
-            color: #00ccff;
-            padding: 8px;
+            padding: 15px;
+            margin: 15px 0;
             border-radius: 5px;
-            font-size: 10px;
-            margin: 5px 0;
+            border: 2px solid #ff9900;
+        }
+
+        audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .loading-indicator {
+            color: #ffcc00;
             text-align: center;
+            margin: 20px 0;
+            font-size: 14px;
         }
 
         @media (max-width: 768px) {
@@ -390,6 +400,12 @@
                     <div class="diktat-id" id="generated-id">XXXXXX</div>
                     <p>Schüler können mit dieser ID auf das Diktat zugreifen.</p>
                 </div>
+                
+                <!-- Ladeindikator (anfangs versteckt) -->
+                <div id="loading-indicator" class="loading-indicator" style="display: none;">
+                    <p>Dein Diktat wird erstellt und Audio-Dateien werden generiert...</p>
+                    <p>Dies kann je nach Länge des Textes einige Sekunden dauern.</p>
+                </div>
             </div>
             
             <!-- Tab: Diktate verwalten -->
@@ -413,10 +429,15 @@
                     <p><strong>Text:</strong></p>
                     <pre id="detail-text"></pre>
                     
-                    <!-- Audio-Status-Anzeige -->
-                    <div class="audio-status" id="audio-status">Bereit für Sprachausgabe</div>
+                    <!-- Audio-Player für Vorschau -->
+                    <div class="audio-player">
+                        <p>Diktat anhören:</p>
+                        <audio id="preview-audio" controls>
+                            <source src="" type="audio/mpeg">
+                            Dein Browser unterstützt keine Audio-Wiedergabe.
+                        </audio>
+                    </div>
                     
-                    <button id="test-playback">Vorschau anhören</button>
                     <button id="back-to-list">Zurück zur Liste</button>
                 </div>
             </div>
@@ -469,6 +490,7 @@
         const speedValue = document.getElementById('speed-value');
         const dictationInfo = document.getElementById('dictation-info');
         const generatedId = document.getElementById('generated-id');
+        const loadingIndicator = document.getElementById('loading-indicator');
         const refreshListButton = document.getElementById('refresh-list');
         const dictationList = document.getElementById('dictation-list');
         const dictationDetails = document.getElementById('dictation-details');
@@ -476,209 +498,12 @@
         const detailId = document.getElementById('detail-id');
         const detailDate = document.getElementById('detail-date');
         const detailText = document.getElementById('detail-text');
-        const testPlaybackButton = document.getElementById('test-playback');
+        const previewAudio = document.getElementById('preview-audio');
         const backToListButton = document.getElementById('back-to-list');
         const refreshResultsButton = document.getElementById('refresh-results');
         const resultsBody = document.getElementById('results-body');
         const exportResultsButton = document.getElementById('export-results');
-        const audioStatus = document.getElementById('audio-status');
-        
-        // Deutsche Stimme - Otto
-        const GERMAN_VOICE_ID = "FTNCalFNG5bRnkkaP5Ug";
-        
-        // Funktion zum Aufrufen der Eleven Labs API über Backend-Proxy
-        async function speakWithElevenLabs(text, voiceId = GERMAN_VOICE_ID) {
-            try {
-                // Status aktualisieren
-                if (audioStatus) {
-                    audioStatus.textContent = "Eleven Labs API wird angerufen...";
-                }
-                
-                // Text kürzen, falls er zu lang ist
-                if (text.length > 300) {
-                    text = text.substring(0, 300) + "...";
-                    console.log("Text wurde gekürzt, um API-Limits einzuhalten");
-                    if (audioStatus) audioStatus.textContent += " (Text gekürzt)";
-                }
-                
-                // Unseren Backend-Proxy statt direkt die Eleven Labs API aufrufen
-                const response = await fetch('/elevenlabs_tts', {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        text: text,
-                        voice_id: voiceId
-                    })
-                });
-
-                if (!response.ok) {
-                    let errorText = `HTTP ${response.status}`;
-                    try {
-                        const errorData = await response.json();
-                        console.error("Error response:", errorData);
-                        errorText += `: ${errorData.error || "Unbekannter Fehler"}`;
-                    } catch (e) {
-                        errorText += `: ${await response.text() || "Keine Fehlerdetails verfügbar"}`;
-                    }
-                    throw new Error(errorText);
-                }
-
-                // Audio-Daten als arrayBuffer erhalten
-                const audioData = await response.arrayBuffer();
-                
-                // Blob und URL für das Audio erstellen
-                const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                
-                // Audio-Element erstellen und abspielen
-                const audioElement = new Audio(audioUrl);
-                
-                // Event-Listener hinzufügen
-                audioElement.onplay = () => {
-                    console.log("Eleven Labs audio started playing");
-                    if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (Eleven Labs)...";
-                };
-                
-                audioElement.onended = () => {
-                    console.log("Eleven Labs audio finished playing");
-                    if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
-                    // URL-Objekt freigeben
-                    URL.revokeObjectURL(audioUrl);
-                };
-                
-                audioElement.onerror = (e) => {
-                    console.error("Error playing Eleven Labs audio:", e);
-                    if (audioStatus) audioStatus.textContent = "Fehler bei der Wiedergabe: " + (e.message || "Unbekannter Fehler");
-                    URL.revokeObjectURL(audioUrl);
-                    throw new Error("Fehler bei der Audio-Wiedergabe: " + (e.message || "Unbekannter Fehler"));
-                };
-
-                // Audio-Element in einer globalen Variable speichern für potenzielle Stornierung
-                window.currentAudioElement = audioElement;
-                
-                // Versuch, das Audio abzuspielen - auf iOS möglicherweise ein Problem
-                try {
-                    const playPromise = audioElement.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch(e => {
-                            console.error("Play promise rejected:", e);
-                            if (audioStatus) audioStatus.textContent = "Fehler beim Starten der Wiedergabe: " + e;
-                            // iOS erfordert oft Benutzerinteraktion, bevor Audio abgespielt werden kann
-                            if (audioStatus) audioStatus.textContent += " (Tippe auf den Bildschirm und versuche es erneut)";
-                        });
-                    }
-                } catch (e) {
-                    console.error("Error during play():", e);
-                    if (audioStatus) audioStatus.textContent = "Fehler beim Abspielen: " + e;
-                    return false;
-                }
-                
-                return true; // Erfolg
-            } catch (error) {
-                console.error("Eleven Labs API error:", error);
-                if (audioStatus) audioStatus.textContent = "Eleven Labs API Fehler: " + error.message;
-                return false; // Fehlgeschlagen
-            }
-        }
-        
-        // Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
-        function replacePunctuationWithWords(text) {
-            return text
-                .replace(/\./g, ' Punkt ')
-                .replace(/,/g, ' Komma ')
-                .replace(/;/g, ' Semikolon ')
-                .replace(/:/g, ' Doppelpunkt ')
-                .replace(/\?/g, ' Fragezeichen ')
-                .replace(/!/g, ' Ausrufezeichen ')
-                .replace(/\(/g, ' Klammer auf ')
-                .replace(/\)/g, ' Klammer zu ')
-                .replace(/\"/g, ' Anführungszeichen ')
-                .replace(/\'/g, ' Apostroph ')
-                .replace(/-/g, ' Bindestrich ')
-                .replace(/\//g, ' Schrägstrich ');
-        }
-        
-        // Verbesserte Sprachausgabe mit Eleven Labs
-        async function speakText(text, rate) {
-            // Aktuelle Audio-Wiedergabe abbrechen
-            if (window.currentAudioElement) {
-                window.currentAudioElement.pause();
-                window.currentAudioElement = null;
-            }
-            
-            // ResponsiveVoice abbrechen, falls es spielt
-            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
-                responsiveVoice.cancel();
-            }
-            
-            // Web Speech API stoppen
-            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
-            }
-            
-            // Status aktualisieren
-            if (audioStatus) {
-                audioStatus.textContent = "Sprachausgabe wird vorbereitet...";
-            }
-            
-            // Zuerst Eleven Labs versuchen
-            const elevenLabsSuccess = await speakWithElevenLabs(text, GERMAN_VOICE_ID);
-            
-            // Wenn Eleven Labs fehlschlägt, auf ResponsiveVoice zurückfallen
-            if (!elevenLabsSuccess) {
-                console.log("Falling back to ResponsiveVoice");
-                if (audioStatus) audioStatus.textContent = "Eleven Labs fehlgeschlagen, verwende ResponsiveVoice...";
-                
-                // Prüfen, ob ResponsiveVoice verfügbar ist
-                if (typeof responsiveVoice === 'undefined') {
-                    console.error("ResponsiveVoice ist nicht verfügbar - Bibliothek nicht geladen");
-                    
-                    // Auf Web Speech API zurückfallen
-                    if ('speechSynthesis' in window) {
-                        if (audioStatus) audioStatus.textContent = "Verwende Browser-Sprachsynthese...";
-                        const utterance = new SpeechSynthesisUtterance(text);
-                        utterance.lang = 'de-DE';
-                        utterance.rate = rate;
-                        
-                        utterance.onstart = function() {
-                            if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (Browser)...";
-                        };
-                        
-                        utterance.onend = function() {
-                            if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
-                        };
-                        
-                        utterance.onerror = function(e) {
-                            if (audioStatus) audioStatus.textContent = "Fehler bei der Sprachausgabe: " + e.error;
-                        };
-                        
-                        window.speechSynthesis.speak(utterance);
-                        return;
-                    } else {
-                        if (audioStatus) audioStatus.textContent = "Fehler: Sprachausgabe nicht verfügbar. Bitte Seite neu laden.";
-                        return;
-                    }
-                }
-                
-                responsiveVoice.speak(text, 'Deutsch Male', {
-                    rate: rate,
-                    onstart: function() {
-                        console.log("ResponsiveVoice gestartet");
-                        if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (ResponsiveVoice)...";
-                    },
-                    onend: function() {
-                        console.log("ResponsiveVoice beendet");
-                        if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
-                    },
-                    onerror: function(e) {
-                        console.error("ResponsiveVoice Fehler:", e);
-                        if (audioStatus) audioStatus.textContent = "ResponsiveVoice Fehler: " + e;
-                    }
-                });
-            }
-        }
+        const createButton = document.getElementById('create-button');
         
         // Tab-Funktionalität
         tabs.forEach(tab => {
@@ -716,11 +541,12 @@
             e.preventDefault();
             
             const formData = new FormData(this);
-            const createButton = document.getElementById('create-button');
             
-            // Button-Status aktualisieren
+            // Button-Status und Ladeindikator aktualisieren
             createButton.textContent = 'Wird erstellt...';
             createButton.disabled = true;
+            loadingIndicator.style.display = 'block';
+            dictationInfo.style.display = 'none';
             
             try {
                 const response = await fetch('/create_dictation', {
@@ -737,9 +563,11 @@
                 // Diktat-ID anzeigen
                 generatedId.textContent = data.dictation_id;
                 dictationInfo.style.display = 'block';
+                loadingIndicator.style.display = 'none';
                 
                 // Formular zurücksetzen
                 diktatForm.reset();
+                speedValue.textContent = '1.0';
                 
                 // Button-Status zurücksetzen
                 createButton.textContent = 'Diktat erstellen';
@@ -749,6 +577,7 @@
                 alert(`Fehler: ${error.message}`);
                 createButton.textContent = 'Diktat erstellen';
                 createButton.disabled = false;
+                loadingIndicator.style.display = 'none';
             }
         });
         
@@ -841,15 +670,16 @@
                 detailDate.textContent = formatDate(dictation.created_at);
                 detailText.textContent = dictation.text;
                 
+                // Audio-Player einrichten
+                if (dictation.audio_file) {
+                    previewAudio.src = `/audio/${dictation.audio_file}`;
+                    previewAudio.load();
+                }
+                
                 // UI aktualisieren
                 dictationList.style.display = 'none';
                 refreshListButton.style.display = 'none';
                 dictationDetails.style.display = 'block';
-                
-                // Status zurücksetzen
-                if (audioStatus) {
-                    audioStatus.textContent = "Bereit für Sprachausgabe";
-                }
                 
             } catch (error) {
                 console.error('Fehler beim Laden der Diktat-Details:', error);
@@ -857,52 +687,14 @@
             }
         }
         
-        // Vorschau abspielen
-        testPlaybackButton.addEventListener('click', function() {
-            const text = detailText.textContent;
-            
-            // Aktuelle Audio-Wiedergabe abbrechen
-            if (window.currentAudioElement) {
-                window.currentAudioElement.pause();
-                window.currentAudioElement = null;
-            }
-            
-            // ResponsiveVoice abbrechen, falls es spielt
-            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
-                responsiveVoice.cancel();
-            }
-            
-            // Web Speech API stoppen
-            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
-            }
-            
-            // Text mit ausgesprochenen Satzzeichen erstellen
-            const textWithSpokenPunctuation = replacePunctuationWithWords(text);
-            
-            // Text abspielen
-            speakText(textWithSpokenPunctuation, parseFloat(speedRange.value));
-        });
-        
         // Zurück zur Liste
         backToListButton.addEventListener('click', function() {
             dictationDetails.style.display = 'none';
             dictationList.style.display = 'block';
             refreshListButton.style.display = 'block';
             
-            // Sprachausgabe stoppen
-            if (window.currentAudioElement) {
-                window.currentAudioElement.pause();
-                window.currentAudioElement = null;
-            }
-            
-            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
-                responsiveVoice.cancel();
-            }
-            
-            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
-            }
+            // Audio pausieren
+            previewAudio.pause();
         });
         
         // Ergebnisse laden
@@ -1034,29 +826,6 @@
             // Standardmäßig den ersten Tab aktivieren
             document.querySelector('.tab.active').click();
         });
-    </script>
-    
-    <!-- ResponsiveVoice Script -->
-    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
-    <script>
-        // Funktion, die nach dem Laden von ResponsiveVoice ausgeführt werden soll
-        if (typeof responsiveVoice !== 'undefined') {
-            console.log("ResponsiveVoice wurde geladen!");
-            
-            // Audio-Kontext für Mobile entsperren beim ersten Laden
-            try {
-                if (responsiveVoice.clickEvent) {
-                    responsiveVoice.clickEvent();
-                }
-                
-                // Verfügbare Stimmen anzeigen
-                if (responsiveVoice.getVoices) {
-                    console.log("Verfügbare Stimmen beim Laden:", responsiveVoice.getVoices().map(v => v.name));
-                }
-            } catch (e) {
-                console.error("Fehler beim initialen ResponsiveVoice Setup:", e);
-            }
-        }
     </script>
 </body>
 </html>
