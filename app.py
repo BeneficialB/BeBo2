@@ -14,8 +14,7 @@ load_dotenv()
 
 # API-Schlüssel
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
-# Wenn die Umgebungsvariable nicht gesetzt ist, verwende den neuen Schlüssel direkt
-ELEVEN_LABS_API_KEY = os.getenv("ELEVEN_LABS_API_KEY", "sk_fc59a3da708a2e13a604edf681925c4567ef4613f3a07a9d")
+ELEVEN_LABS_API_KEY = os.getenv("ELEVEN_LABS_API_KEY")
 
 # Passwort für den Lehrerbereich
 TEACHER_PASSWORD = "Hamburg1!"
@@ -35,8 +34,8 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "diktate-sind-cool-aber-geheim")
 dictations = {}
 results = []  # Hier werden die Schülerergebnisse gespeichert
 
-# Deutsche Stimme für die TTS - Julia
-GERMAN_VOICE_ID = "5XpnZmJA35ZNSAZfsjaz"  # Julia (deutsche Stimme)
+# Deutsche Stimme für die TTS - Otto
+GERMAN_VOICE_ID = "FTNCalFNG5bRnkkaP5Ug"  # Otto (deutsche Stimme)
 
 # Hilfsfunktion für Diktat-ID-Generierung
 def generate_dictation_id(length=6):
@@ -97,20 +96,21 @@ def env_check():
         "ELEVEN_LABS_KEY_LENGTH": len(ELEVEN_LABS_API_KEY) if ELEVEN_LABS_API_KEY else 0,
         "ELEVEN_LABS_KEY_START": ELEVEN_LABS_API_KEY[:5] + "..." if ELEVEN_LABS_API_KEY else "None",
         "CLAUDE_API_KEY": CLAUDE_API_KEY is not None,
-        "GERMAN_VOICE_ID": GERMAN_VOICE_ID
+        "GERMAN_VOICE_ID": GERMAN_VOICE_ID,
+        "VOICE_NAME": "Otto"
     }
     return jsonify(env_vars)
 
 @app.route("/elevenlabs_test")
 def elevenlabs_test():
-    """Einfacher Test für die Eleven Labs API mit Julia-Stimme"""
+    """Einfacher Test für die Eleven Labs API mit Otto-Stimme"""
     if not ELEVEN_LABS_API_KEY:
         return jsonify({
             "success": False,
             "error": "Eleven Labs API-Schlüssel nicht gefunden!"
         })
     
-    test_text = "Hallo, ich bin Julia. Ich helfe dir bei deinem Diktat."
+    test_text = "Hallo, ich bin Otto. Ich helfe dir bei deinem Diktat."
     
     try:
         # Eleven Labs API aufrufen
@@ -182,8 +182,8 @@ def validate_eleven_key():
                 voices = [{"voice_id": v["voice_id"], "name": v["name"]} 
                          for v in voices_data.get("voices", [])]
                 
-                # Prüfen, ob unsere Julia-Stimme verfügbar ist
-                julia_available = any(v["voice_id"] == GERMAN_VOICE_ID for v in voices)
+                # Prüfen, ob unsere Otto-Stimme verfügbar ist
+                otto_available = any(v["voice_id"] == GERMAN_VOICE_ID for v in voices)
                 
                 # Detaillierte API-Informationen zurückgeben
                 return jsonify({
@@ -191,7 +191,7 @@ def validate_eleven_key():
                     "subscription": subscription_data,
                     "voices_count": len(voices),
                     "voices": voices,
-                    "julia_available": julia_available,
+                    "otto_available": otto_available,
                     "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "..."
                 })
             else:
@@ -324,7 +324,7 @@ def elevenlabs_tts():
         return jsonify({"error": "Ungültige JSON-Daten"}), 400
     
     text = data.get("text")
-    # Standardmäßig die Julia-Stimme verwenden
+    # Standardmäßig die Otto-Stimme verwenden
     voice_id = data.get("voice_id", GERMAN_VOICE_ID)
     
     if not text:
