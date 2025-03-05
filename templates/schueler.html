@@ -318,82 +318,6 @@
         </div>
     </div>
     
-    <!-- ResponsiveVoice Script mit API-Key und Callback -->
-    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
-    <script>
-        // Variable, um den Status des ResponsiveVoice zu verfolgen
-        window.rvLoaded = false;
-        
-        // Funktion, die aufgerufen wird, wenn ResponsiveVoice geladen ist
-        function responsiveVoiceLoaded() {
-            console.log("ResponsiveVoice ist vollständig geladen!");
-            window.rvLoaded = true;
-            
-            // Verfügbare Stimmen ausgeben (für Debugging)
-            if (responsiveVoice.getVoices) {
-                const voices = responsiveVoice.getVoices();
-                console.log("Verfügbare Stimmen:", voices);
-                
-                // Prüfen, ob Deutsche Stimme verfügbar ist
-                const germanVoice = voices.find(v => v.name === "Deutsch Male");
-                if (germanVoice) {
-                    console.log("Deutsche Männerstimme gefunden:", germanVoice);
-                } else {
-                    console.warn("Keine deutsche Männerstimme gefunden!");
-                }
-            }
-        }
-        
-        // Event-Listener für DOM-Laden
-        document.addEventListener('DOMContentLoaded', function() {
-            // Versuche, ResponsiveVoice zu initialisieren, falls es bereits geladen wurde
-            if (typeof responsiveVoice !== 'undefined') {
-                console.log("ResponsiveVoice ist bereits verfügbar");
-                // Force initialization und prüfe, ob Browser Sprachunterstützung hat
-                if (!responsiveVoice.isInitialised()) {
-                    responsiveVoice.init();
-                    responsiveVoiceLoaded();
-                } else {
-                    window.rvLoaded = true;
-                }
-            } else {
-                console.warn("ResponsiveVoice ist noch nicht verfügbar, warte auf Laden...");
-            }
-            
-            // Audio-Kontext für Mobile entsperren
-            const unlockAudio = () => {
-                console.log("Audio-Kontext für Mobile entsperren...");
-                try {
-                    // Erstelle einen stillen Audio-Kontext
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
-                    gainNode.gain.value = 0; // Stille
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-                    oscillator.start(0);
-                    oscillator.stop(0.1);
-                    
-                    // Versuche auch, ResponsiveVoice direkt zu entsperren
-                    if (typeof responsiveVoice !== 'undefined' && responsiveVoice.clickEvent) {
-                        responsiveVoice.clickEvent();
-                    }
-                    
-                    // Event-Listener nach erster Interaktion entfernen
-                    document.removeEventListener('click', unlockAudio);
-                    document.removeEventListener('touchstart', unlockAudio);
-                    console.log("Audio entsperrt!");
-                } catch (e) {
-                    console.error("Fehler beim Entsperren des Audio-Kontexts:", e);
-                }
-            };
-            
-            // Event-Listener hinzufügen, um Audio bei erster Interaktion zu entsperren
-            document.addEventListener('click', unlockAudio);
-            document.addEventListener('touchstart', unlockAudio);
-        });
-    </script>
-    
     <script>
         // DOM-Elemente
         const idForm = document.getElementById('id-form');
@@ -743,6 +667,29 @@
             // Status zurücksetzen
             audioStatus.textContent = "";
         });
+    </script>
+
+    <!-- ResponsiveVoice Script korrekt vor dem schließenden </body> Tag platzieren -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
+    <script>
+        // Funktion, die nach dem Laden von ResponsiveVoice ausgeführt werden soll
+        if (typeof responsiveVoice !== 'undefined') {
+            console.log("ResponsiveVoice wurde geladen!");
+            
+            // Audio-Kontext für Mobile entsperren beim ersten Laden
+            try {
+                if (responsiveVoice.clickEvent) {
+                    responsiveVoice.clickEvent();
+                }
+                
+                // Verfügbare Stimmen anzeigen
+                if (responsiveVoice.getVoices) {
+                    console.log("Verfügbare Stimmen beim Laden:", responsiveVoice.getVoices().map(v => v.name));
+                }
+            } catch (e) {
+                console.error("Fehler beim initialen ResponsiveVoice Setup:", e);
+            }
+        }
     </script>
 </body>
 </html>
