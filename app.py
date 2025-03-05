@@ -16,12 +16,6 @@ load_dotenv()
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
 ELEVEN_LABS_API_KEY = os.getenv("ELEVEN_LABS_API_KEY")
 
-# Debug-Ausgabe zur Überprüfung des API-Schlüssels (Nur die ersten 5 Zeichen zur Sicherheit)
-if ELEVEN_LABS_API_KEY:
-    print(f"Eleven Labs API-Schlüssel gefunden: {ELEVEN_LABS_API_KEY[:5]}...")
-else:
-    print("❌ FEHLER: Eleven Labs API-Schlüssel nicht gefunden!")
-
 # Passwort für den Lehrerbereich
 TEACHER_PASSWORD = "Hamburg1!"
 
@@ -39,6 +33,11 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "diktate-sind-cool-aber-geheim")
 # Datenbank-Simulation für Diktate und Ergebnisse (im Produktiveinsatz durch eine echte DB ersetzen)
 dictations = {}
 results = []  # Hier werden die Schülerergebnisse gespeichert
+
+# Deutsche Stimmen für die TTS (Aria sollte multilingual sein)
+GERMAN_VOICE_ID = "9BWtsMINqrJLrRacOk9x"  # Aria
+# Fallback Stimmen, falls Aria nicht funktioniert
+FALLBACK_VOICE_IDS = ["EXAVITQu4vr4xnSDxMaL", "CwhRBWXzGAHq8TQ4Fs17"]
 
 # Hilfsfunktion für Diktat-ID-Generierung
 def generate_dictation_id(length=6):
@@ -90,6 +89,65 @@ def teacher_view():
 def student_view():
     """Render die Schüleransicht."""
     return render_template("schueler.html")
+
+@app.route("/env_check")
+def env_check():
+    """Einfacher Endpunkt zur Überprüfung der Umgebungsvariablen"""
+    env_vars = {
+        "ELEVEN_LABS_API_KEY": ELEVEN_LABS_API_KEY is not None,
+        "ELEVEN_LABS_KEY_LENGTH": len(ELEVEN_LABS_API_KEY) if ELEVEN_LABS_API_KEY else 0,
+        "ELEVEN_LABS_KEY_START": ELEVEN_LABS_API_KEY[:5] + "..." if ELEVEN_LABS_API_KEY else "None",
+        "CLAUDE_API_KEY": CLAUDE_API_KEY is not None
+    }
+    return jsonify(env_vars)
+
+@app.route("/elevenlabs_test")
+def elevenlabs_test():
+    """Einfacher Test für die Eleven Labs API"""
+    if not ELEVEN_LABS_API_KEY:
+        return jsonify({
+            "success": False,
+            "error": "Eleven Labs API-Schlüssel nicht gefunden!"
+        })
+    
+    test_text = "Hallo, das ist ein Testtext für die Sprachausgabe."
+    
+    try:
+        # Eleven Labs API aufrufen, um verfügbare Stimmen zu holen
+        api_url = "https://api.elevenlabs.io/v1/voices"
+        
+        response = requests.get(
+            api_url,
+            headers={
+                "xi-api-key": ELEVEN_LABS_API_KEY
+            }
+        )
+        
+        if response.ok:
+            voice_data = response.json()
+            voices = [{"voice_id": v["voice_id"], "name": v["name"]} for v in voice_data.get("voices", [])]
+            return jsonify({
+                "status": "success",
+                "message": "Erfolgreich mit Eleven Labs API verbunden",
+                "key_found": True,
+                "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "...",
+                "voices_count": len(voices),
+                "voices": voices[:3]  # Nur die ersten 3 Stimmen anzeigen
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": f"Fehler bei der Verbindung zur Eleven Labs API: {response.status_code}",
+                "key_found": True,
+                "key_starts_with": ELEVEN_LABS_API_KEY[:5] + "...",
+                "response": response.text
+            })
+    
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        })
 
 @app.route("/create_dictation", methods=["POST"])
 @teacher_login_required
@@ -190,39 +248,34 @@ def elevenlabs_tts():
     # Daten aus der Anfrage holen
     try:
         data = request.json
-        print(f"Erhaltene Daten: {json.dumps(data)}")
+        print(f"Received request data for TTS")
     except Exception as e:
-        print(f"Fehler beim Parsen der JSON-Daten: {e}")
+        print(f"Error parsing request data: {e}")
         return jsonify({"error": "Ungültige JSON-Daten"}), 400
-        
+    
     text = data.get("text")
-    voice_id = data.get("voice_id", "NLdsrIcUBS4NcgKkzSzj")  # Nicole (Deutsch)
+    # Standardmäßig die deutsche Stimme "Aria" verwenden
+    voice_id = data.get("voice_id", GERMAN_VOICE_ID)
     
     if not text:
-        print("❌ Kein Text in der Anfrage!")
         return jsonify({"error": "Kein Text angegeben."}), 400
-        
-    print(f"Text für TTS: {text[:30]}... (gekürzt)")
-    print(f"Voice ID: {voice_id}")
+
+    # Textlänge begrenzen, um Probleme mit der API zu vermeiden
+    if len(text) > 300:
+        text = text[:300] + "..."
+        print("Text was truncated to 300 characters due to length restrictions")
 
     try:
         # Eleven Labs API aufrufen
         api_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
         
-        # Request-Payload erstellen
+        # Einfache Payload mit minimalen Parametern
         payload = {
             "text": text,
-            "model_id": "eleven_multilingual_v2",
-            "voice_settings": {
-                "stability": 0.5,
-                "similarity_boost": 0.75,
-                "style": 0.0,
-                "use_speaker_boost": True
-            }
+            "model_id": "eleven_multilingual_v2"
         }
         
-        print(f"Sende Anfrage an Eleven Labs API: {api_url}")
-        print(f"Headers: {{'xi-api-key': '****', 'Content-Type': 'application/json'}}")
+        print(f"Sende Anfrage an Eleven Labs API mit Stimme: {voice_id}")
         
         response = requests.post(
             api_url,
@@ -233,14 +286,45 @@ def elevenlabs_tts():
             json=payload
         )
         
-        # Response details ausgeben für Debugging
+        # Response-Status protokollieren
         print(f"Eleven Labs API Status Code: {response.status_code}")
         
         # Antwort überprüfen
         if not response.ok:
-            error_content = response.text
-            print(f"❌ Eleven Labs API Fehler: {response.status_code} - {error_content}")
-            return jsonify({"error": f"Eleven Labs API-Fehler: {response.status_code}", "details": error_content}), response.status_code
+            error_msg = f"Eleven Labs API-Fehler: {response.status_code}"
+            try:
+                error_json = response.json()
+                error_msg += f" - {json.dumps(error_json)}"
+            except:
+                error_msg += f" - {response.text}"
+            
+            # Fallback auf andere Stimme versuchen, wenn die aktuelle nicht funktioniert
+            if response.status_code == 400 or response.status_code == 404:
+                for fallback_voice in FALLBACK_VOICE_IDS:
+                    try:
+                        print(f"Versuche Fallback-Stimme: {fallback_voice}")
+                        fallback_url = f"https://api.elevenlabs.io/v1/text-to-speech/{fallback_voice}"
+                        fallback_response = requests.post(
+                            fallback_url,
+                            headers={
+                                "Content-Type": "application/json",
+                                "xi-api-key": ELEVEN_LABS_API_KEY
+                            },
+                            json=payload
+                        )
+                        
+                        if fallback_response.ok:
+                            print(f"Fallback auf Stimme {fallback_voice} erfolgreich!")
+                            return Response(
+                                fallback_response.content,
+                                mimetype="audio/mpeg",
+                                headers={"Cache-Control": "no-cache"}
+                            )
+                    except Exception as fe:
+                        print(f"Fehler beim Fallback auf Stimme {fallback_voice}: {str(fe)}")
+            
+            print(error_msg)
+            return jsonify({"error": error_msg}), response.status_code
         
         print("✅ Eleven Labs API erfolgreiche Antwort!")
         # Audio-Daten zurückgeben
@@ -251,8 +335,9 @@ def elevenlabs_tts():
         )
         
     except Exception as e:
-        print(f"❌ Allgemeiner Fehler bei der Eleven Labs API: {str(e)}")
-        return jsonify({"error": f"Fehler bei der Eleven Labs API: {str(e)}"}), 500
+        error_msg = f"Fehler bei der Eleven Labs API: {str(e)}"
+        print(error_msg)
+        return jsonify({"error": error_msg}), 500
 
 @app.route("/get_dictations")
 @teacher_login_required
@@ -381,50 +466,6 @@ def check_dictation():
 def get_results():
     """Gibt eine Liste aller Ergebnisse zurück (nur für Lehreransicht)."""
     return jsonify(results)
-
-@app.route("/test_elevenlabs", methods=["GET"])
-def test_elevenlabs():
-    """Test-Endpunkt zur Überprüfung der Eleven Labs API."""
-    if not ELEVEN_LABS_API_KEY:
-        return jsonify({
-            "status": "error",
-            "message": "Eleven Labs API-Schlüssel nicht konfiguriert.",
-            "key_found": False
-        })
-    
-    try:
-        # Test-Anfrage an Eleven Labs API
-        response = requests.get(
-            "https://api.elevenlabs.io/v1/voices",
-            headers={"xi-api-key": ELEVEN_LABS_API_KEY}
-        )
-        
-        if response.ok:
-            voice_data = response.json()
-            voices = [{"voice_id": v["voice_id"], "name": v["name"]} for v in voice_data.get("voices", [])]
-            return jsonify({
-                "status": "success",
-                "message": "Erfolgreich mit Eleven Labs API verbunden",
-                "key_found": True,
-                "key_starts_with": ELEVEN_LABS_API_KEY[:5],
-                "voices_count": len(voices),
-                "voices": voices[:3]  # Nur die ersten 3 Stimmen anzeigen
-            })
-        else:
-            return jsonify({
-                "status": "error",
-                "message": f"Fehler bei der Verbindung zur Eleven Labs API: {response.status_code}",
-                "key_found": True,
-                "key_starts_with": ELEVEN_LABS_API_KEY[:5],
-                "response": response.text
-            })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": f"Fehler bei der Verbindung zur Eleven Labs API: {str(e)}",
-            "key_found": True,
-            "key_starts_with": ELEVEN_LABS_API_KEY[:5]
-        })
 
 if __name__ == "__main__":
     app.run(debug=True)
