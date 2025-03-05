@@ -119,27 +119,32 @@
             display: flex;
             gap: 10px;
             margin: 10px 0;
+            flex-direction: column;
         }
 
-        .audio-controls button {
-            flex: 1;
-            font-size: 12px;
+        .audio-player {
+            width: 100%;
+            background-color: #222222;
+            border-radius: 5px;
+            border: 2px solid #ff9900;
             padding: 10px;
+            margin-bottom: 10px;
         }
 
-        /* Diktat-Navigationsbuttons */
-        .navigation-controls {
+        audio {
+            width: 100%;
+        }
+
+        .section-buttons {
             display: flex;
             gap: 10px;
             margin: 10px 0;
         }
 
-        .navigation-controls button {
+        .section-button {
             flex: 1;
             font-size: 12px;
-            padding: 8px;
-            min-width: initial;
-            max-width: 60px;
+            padding: 10px;
         }
 
         /* Diktat-Eingabe */
@@ -225,15 +230,11 @@
             margin: 10px 0;
         }
 
-        /* Audio-Status-Anzeige */
-        .audio-status {
-            background: #222222;
-            color: #00ccff;
-            padding: 8px;
-            border-radius: 5px;
-            font-size: 10px;
-            margin: 5px 0;
+        /* Lademeldung */
+        .loading-message {
             text-align: center;
+            margin: 20px;
+            color: #ffcc00;
         }
 
         /* Responsive Design */
@@ -250,17 +251,11 @@
                 width: 100%;
             }
 
-            .audio-controls {
-                flex-direction: column;
-            }
-            
-            .navigation-controls {
-                display: flex;
+            .section-buttons {
                 flex-direction: row;
-                justify-content: center;
             }
             
-            .navigation-controls button {
+            .section-buttons button {
                 flex: 0 1 auto;
                 width: 30%;
                 font-size: 11px;
@@ -301,31 +296,27 @@
                     
                     <button type="submit">Diktat laden</button>
                 </form>
-                
-                <!-- Test-Button für Entwicklung (bei Bedarf einschalten) -->
-                <button id="test-tts-button" type="button" 
-                  style="background-color: #00ccff; margin-top: 10px;">
-                  Sprachausgabe testen
-                </button>
             </div>
             
             <!-- Diktat-Bereich (anfangs versteckt) -->
             <div id="dictation-section" style="display: none;">
                 <h2 id="dictation-title">Titel des Diktats</h2>
                 
-                <!-- Audio-Status-Anzeige -->
-                <div class="audio-status" id="audio-status">Bereit für Sprachausgabe</div>
-                
-                <!-- Audio-Steuerung - einfache Buttons -->
+                <!-- Audio-Player -->
                 <div class="audio-controls">
-                    <button id="play-button">Ganzes Diktat abspielen</button>
-                </div>
-                
-                <!-- Satz-Navigation -->
-                <div class="navigation-controls">
-                    <button id="section1-button">1</button>
-                    <button id="section2-button">2</button>
-                    <button id="section3-button">3</button>
+                    <div class="audio-player">
+                        <h3>Ganzes Diktat:</h3>
+                        <audio id="full-audio-player" controls>
+                            <source src="" type="audio/mpeg">
+                            Dein Browser unterstützt keine Audio-Wiedergabe.
+                        </audio>
+                    </div>
+                    
+                    <div class="section-buttons">
+                        <button id="section1-button" class="section-button">Abschnitt 1</button>
+                        <button id="section2-button" class="section-button">Abschnitt 2</button>
+                        <button id="section3-button" class="section-button">Abschnitt 3</button>
+                    </div>
                 </div>
                 
                 <!-- Diktat-Eingabe -->
@@ -368,7 +359,7 @@
         const idInputSection = document.getElementById('id-input-section');
         const dictationSection = document.getElementById('dictation-section');
         const dictationTitle = document.getElementById('dictation-title');
-        const playButton = document.getElementById('play-button');
+        const fullAudioPlayer = document.getElementById('full-audio-player');
         const section1Button = document.getElementById('section1-button');
         const section2Button = document.getElementById('section2-button');
         const section3Button = document.getElementById('section3-button');
@@ -379,347 +370,11 @@
         const resultScore = document.getElementById('result-score');
         const resultPercent = document.getElementById('result-percent');
         const newDictationButton = document.getElementById('new-dictation');
-        const audioStatus = document.getElementById('audio-status');
-        const testTtsButton = document.getElementById('test-tts-button');
         
         // Globale Variablen für das Diktat
         let currentDictationId = null;
-        let dictationSpeed = 1.0;
         let studentName = '';
-        let sections = [];
-        
-        // Deutsche Stimme - Otto
-        const GERMAN_VOICE_ID = "FTNCalFNG5bRnkkaP5Ug";
-        
-        // Test-Funktion für Text-to-Speech
-        async function testTTS() {
-            try {
-                if (audioStatus) {
-                    audioStatus.textContent = "Teste Eleven Labs API...";
-                }
-                
-                // Test-Text senden
-                const response = await fetch('/elevenlabs_tts', {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        text: "Hallo! Ich bin Otto. Ich helfe dir bei deinem Diktat.",
-                        voice_id: GERMAN_VOICE_ID
-                    })
-                });
-
-                if (!response.ok) {
-                    let errorText = `HTTP ${response.status}`;
-                    try {
-                        const errorData = await response.json();
-                        console.error("Error response:", errorData);
-                        errorText += `: ${JSON.stringify(errorData)}`;
-                    } catch (e) {
-                        errorText += `: ${await response.text() || "Keine Fehlerdetails verfügbar"}`;
-                    }
-                    throw new Error(errorText);
-                }
-
-                // Audio-Daten als arrayBuffer erhalten
-                const audioData = await response.arrayBuffer();
-                
-                // Blob und URL für das Audio erstellen
-                const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                
-                // Audio-Element erstellen und abspielen
-                const audioElement = new Audio(audioUrl);
-                
-                audioElement.onplay = () => {
-                    console.log("Test audio started playing");
-                    if (audioStatus) audioStatus.textContent = "Test-Audio wird abgespielt...";
-                };
-                
-                audioElement.onended = () => {
-                    console.log("Test audio finished playing");
-                    if (audioStatus) audioStatus.textContent = "Test-Audio abgeschlossen.";
-                    URL.revokeObjectURL(audioUrl);
-                };
-                
-                audioElement.onerror = (e) => {
-                    console.error("Error playing test audio:", e);
-                    if (audioStatus) audioStatus.textContent = "Fehler bei der Wiedergabe: " + (e.message || "Unbekannter Fehler");
-                    URL.revokeObjectURL(audioUrl);
-                };
-
-                // Audio abspielen
-                try {
-                    await audioElement.play();
-                } catch (e) {
-                    console.error("Error playing audio:", e);
-                    if (audioStatus) audioStatus.textContent = "Fehler beim Abspielen des Audios. Tippen Sie auf den Bildschirm und versuchen Sie es erneut.";
-                }
-                
-                console.log("Test TTS erfolgreich");
-                return true;
-            } catch (error) {
-                console.error("Test TTS fehlgeschlagen:", error);
-                if (audioStatus) audioStatus.textContent = "Test fehlgeschlagen: " + error.message;
-                return false;
-            }
-        }
-        
-        // Test-Button mit der Test-Funktion verbinden
-        if (testTtsButton) {
-            testTtsButton.addEventListener('click', testTTS);
-        }
-        
-        // Funktion zum Aufrufen der Eleven Labs API über Backend-Proxy
-        async function speakWithElevenLabs(text, voiceId = GERMAN_VOICE_ID) {
-            try {
-                // Status aktualisieren
-                if (audioStatus) {
-                    audioStatus.textContent = "Eleven Labs API wird angerufen...";
-                }
-                
-                // Text kürzen, falls er zu lang ist
-                if (text.length > 300) {
-                    text = text.substring(0, 300) + "...";
-                    console.log("Text wurde gekürzt, um API-Limits einzuhalten");
-                    if (audioStatus) audioStatus.textContent += " (Text gekürzt)";
-                }
-                
-                // Unseren Backend-Proxy statt direkt die Eleven Labs API aufrufen
-                const response = await fetch('/elevenlabs_tts', {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        text: text,
-                        voice_id: voiceId
-                    })
-                });
-
-                if (!response.ok) {
-                    let errorText = `HTTP ${response.status}`;
-                    try {
-                        const errorData = await response.json();
-                        console.error("Error response:", errorData);
-                        errorText += `: ${errorData.error || "Unbekannter Fehler"}`;
-                    } catch (e) {
-                        errorText += `: ${await response.text() || "Keine Fehlerdetails verfügbar"}`;
-                    }
-                    throw new Error(errorText);
-                }
-
-                // Audio-Daten als arrayBuffer erhalten
-                const audioData = await response.arrayBuffer();
-                
-                // Blob und URL für das Audio erstellen
-                const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                
-                // Audio-Element erstellen und abspielen
-                const audioElement = new Audio(audioUrl);
-                
-                // Event-Listener hinzufügen
-                audioElement.onplay = () => {
-                    console.log("Eleven Labs audio started playing");
-                    if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (Eleven Labs)...";
-                };
-                
-                audioElement.onended = () => {
-                    console.log("Eleven Labs audio finished playing");
-                    if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
-                    // URL-Objekt freigeben
-                    URL.revokeObjectURL(audioUrl);
-                };
-                
-                audioElement.onerror = (e) => {
-                    console.error("Error playing Eleven Labs audio:", e);
-                    if (audioStatus) audioStatus.textContent = "Fehler bei der Wiedergabe: " + (e.message || "Unbekannter Fehler");
-                    URL.revokeObjectURL(audioUrl);
-                    throw new Error("Fehler bei der Audio-Wiedergabe: " + (e.message || "Unbekannter Fehler"));
-                };
-
-                // Audio-Element in einer globalen Variable speichern für potenzielle Stornierung
-                window.currentAudioElement = audioElement;
-                
-                // Versuch, das Audio abzuspielen - auf iOS möglicherweise ein Problem
-                try {
-                    const playPromise = audioElement.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch(e => {
-                            console.error("Play promise rejected:", e);
-                            if (audioStatus) audioStatus.textContent = "Fehler beim Starten der Wiedergabe: " + e;
-                            // iOS erfordert oft Benutzerinteraktion, bevor Audio abgespielt werden kann
-                            if (audioStatus) audioStatus.textContent += " (Tippe auf den Bildschirm und versuche es erneut)";
-                        });
-                    }
-                } catch (e) {
-                    console.error("Error during play():", e);
-                    if (audioStatus) audioStatus.textContent = "Fehler beim Abspielen: " + e;
-                    return false;
-                }
-                
-                return true; // Erfolg
-            } catch (error) {
-                console.error("Eleven Labs API error:", error);
-                if (audioStatus) audioStatus.textContent = "Eleven Labs API Fehler: " + error.message;
-                return false; // Fehlgeschlagen
-            }
-        }
-        
-        // Prüfen ob Sprache unterstützt wird
-        function checkVoiceSupport() {
-            // Prüfen ob ResponsiveVoice verfügbar ist
-            if (typeof responsiveVoice === 'undefined') {
-                return false;
-            }
-            
-            // Prüfen ob Web Speech API verfügbar ist
-            if (!('speechSynthesis' in window)) {
-                return false;
-            }
-            
-            return true;
-        }
-
-        // Funktion, um die beste verfügbare deutsche Stimme zu ermitteln
-        function getBestGermanVoice() {
-            // Prioritätsreihenfolge für deutsche Stimmen
-            const germanVoicePriority = [
-                "Deutsch Male", 
-                "Deutsch Female",
-                "German Male",
-                "German Female"
-            ];
-            
-            // Verfügbare Stimmen prüfen
-            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.getVoices) {
-                const availableVoices = responsiveVoice.getVoices().map(v => v.name);
-                
-                // Die erste verfügbare deutsche Stimme in der Prioritätsreihenfolge verwenden
-                for (const voice of germanVoicePriority) {
-                    if (availableVoices.includes(voice)) {
-                        console.log(`Verwende deutsche Stimme: ${voice}`);
-                        return voice;
-                    }
-                }
-            }
-            
-            // Fallback zur Standard-deutschen Stimme
-            return "Deutsch Male";
-        }
-        
-        // Verbesserte speakText-Funktion, die zuerst Eleven Labs versucht
-        async function speakText(text, rate) {
-            // Aktuelle Audio-Wiedergabe abbrechen
-            if (window.currentAudioElement) {
-                window.currentAudioElement.pause();
-                window.currentAudioElement = null;
-            }
-            
-            // ResponsiveVoice abbrechen, falls es spielt
-            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
-                responsiveVoice.cancel();
-            }
-            
-            // Web Speech API stoppen
-            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
-            }
-            
-            // Status aktualisieren
-            if (audioStatus) {
-                audioStatus.textContent = "Sprachausgabe wird vorbereitet...";
-            }
-            
-            // Zuerst Eleven Labs versuchen
-            const elevenLabsSuccess = await speakWithElevenLabs(text, GERMAN_VOICE_ID);
-            
-            // Wenn Eleven Labs fehlschlägt, auf ResponsiveVoice zurückfallen
-            if (!elevenLabsSuccess) {
-                console.log("Falling back to ResponsiveVoice");
-                if (audioStatus) audioStatus.textContent = "Eleven Labs fehlgeschlagen, verwende ResponsiveVoice...";
-                
-                // Prüfen, ob ResponsiveVoice verfügbar ist
-                if (typeof responsiveVoice === 'undefined') {
-                    console.error("ResponsiveVoice ist nicht verfügbar - Bibliothek nicht geladen");
-                    
-                    // Auf Web Speech API zurückfallen
-                    if ('speechSynthesis' in window) {
-                        if (audioStatus) audioStatus.textContent = "Verwende Browser-Sprachsynthese...";
-                        const utterance = new SpeechSynthesisUtterance(text);
-                        utterance.lang = 'de-DE';
-                        utterance.rate = rate;
-                        
-                        utterance.onstart = function() {
-                            if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (Browser)...";
-                        };
-                        
-                        utterance.onend = function() {
-                            if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
-                        };
-                        
-                        utterance.onerror = function(e) {
-                            if (audioStatus) audioStatus.textContent = "Fehler bei der Sprachausgabe: " + e.error;
-                        };
-                        
-                        window.speechSynthesis.speak(utterance);
-                        return;
-                    } else {
-                        if (audioStatus) audioStatus.textContent = "Fehler: Sprachausgabe nicht verfügbar. Bitte Seite neu laden.";
-                        return;
-                    }
-                }
-                
-                // Sicherstellen, dass ResponsiveVoice initialisiert ist
-                if (!responsiveVoice.isInitialised()) {
-                    console.log("ResponsiveVoice wird initialisiert...");
-                    responsiveVoice.init();
-                }
-                
-                // Voice-Optionen
-                const voiceOptions = {
-                    rate: rate || 1.0,
-                    pitch: 1,
-                    volume: 1,
-                    onstart: function() {
-                        console.log("ResponsiveVoice gestartet");
-                        if (audioStatus) audioStatus.textContent = "Sprachausgabe läuft (ResponsiveVoice)...";
-                    },
-                    onend: function() {
-                        console.log("ResponsiveVoice beendet");
-                        if (audioStatus) audioStatus.textContent = "Sprachausgabe abgeschlossen.";
-                    },
-                    onerror: function(e) {
-                        console.error("ResponsiveVoice Fehler:", e);
-                        if (audioStatus) audioStatus.textContent = "ResponsiveVoice Fehler: " + e;
-                    }
-                };
-                
-                // Die beste verfügbare deutsche Stimme verwenden
-                const bestVoice = getBestGermanVoice();
-                responsiveVoice.speak(text, bestVoice, voiceOptions);
-            }
-        }
-        
-        // Funktion zum Ersetzen der Satzzeichen durch gesprochene Wörter
-        function replacePunctuationWithWords(text) {
-            return text
-                .replace(/\./g, ' Punkt ')
-                .replace(/,/g, ' Komma ')
-                .replace(/;/g, ' Semikolon ')
-                .replace(/:/g, ' Doppelpunkt ')
-                .replace(/\?/g, ' Fragezeichen ')
-                .replace(/!/g, ' Ausrufezeichen ')
-                .replace(/\(/g, ' Klammer auf ')
-                .replace(/\)/g, ' Klammer zu ')
-                .replace(/\"/g, ' Anführungszeichen ')
-                .replace(/\'/g, ' Apostroph ')
-                .replace(/-/g, ' Bindestrich ')
-                .replace(/\//g, ' Schrägstrich ')
-                .replace(/\s+/g, ' '); // Entfernt mehrfache Leerzeichen
-        }
+        let sectionAudioPlayers = [];
         
         // Diktat-ID laden
         idForm.addEventListener('submit', async function(e) {
@@ -746,12 +401,20 @@
                 
                 const dictation = await response.json();
                 
-                // Geschwindigkeit speichern
-                dictationSpeed = dictation.speed;
+                // Diktat-ID speichern
                 currentDictationId = dictationId;
                 
                 // UI aktualisieren
                 dictationTitle.textContent = dictation.title;
+                
+                // Audio-Player einrichten
+                if (dictation.audio_file) {
+                    fullAudioPlayer.src = `/audio/${dictation.audio_file}`;
+                    fullAudioPlayer.load();
+                }
+                
+                // Abschnitts-Buttons einrichten
+                setupSectionButtons(dictation.section_audio_files);
                 
                 // Diktat-Bereich anzeigen
                 idInputSection.style.display = 'none';
@@ -761,98 +424,57 @@
                 // Eingabefeld leeren
                 dictationInput.value = '';
                 
-                // Jetzt den Diktat-Text über den speziellen Audio-Endpunkt holen
-                try {
-                    const audioResponse = await fetch(`/get_dictation_audio/${dictationId}`);
-                    if (audioResponse.ok) {
-                        const audioData = await audioResponse.json();
-                        
-                        // Sprachausgabe vorbereiten
-                        prepareUtterance(audioData.text, audioData.speed);
-                    } else {
-                        // Fallback auf den alten Ansatz
-                        const fullDictationResponse = await fetch(`/get_full_dictation/${dictationId}`);
-                        if (fullDictationResponse.ok) {
-                            const fullDictation = await fullDictationResponse.json();
-                            prepareUtterance(fullDictation.text, dictation.speed);
-                        } else {
-                            console.error('Diktattext nicht geladen');
-                            if (audioStatus) audioStatus.textContent = "Fehler: Diktattext konnte nicht geladen werden";
-                        }
-                    }
-                } catch (audioError) {
-                    console.error('Fehler beim Laden des Diktattextes:', audioError);
-                    if (audioStatus) audioStatus.textContent = "Fehler: " + audioError.message;
-                }
-                
             } catch (error) {
                 alert(`Fehler: ${error.message}. Bitte überprüfe die Diktat-ID.`);
             }
         });
         
-        // Sprachausgabe vorbereiten
-        function prepareUtterance(text, speed) {
-            // Text für spätere Verwendung speichern
-            window.diktatFullText = text;
-            window.diktatSpeed = speed;
+        // Abschnitts-Buttons einrichten
+        function setupSectionButtons(sectionFiles) {
+            // Audio-Player für Abschnitte erstellen
+            sectionAudioPlayers = [];
             
-            // Text in 3 etwa gleich große Abschnitte teilen
-            const words = text.split(/\s+/);
-            const sectionSize = Math.ceil(words.length / 3);
+            // Wenn keine Abschnittsdateien verfügbar sind, Buttons deaktivieren
+            if (!sectionFiles || sectionFiles.length === 0) {
+                section1Button.disabled = true;
+                section2Button.disabled = true;
+                section3Button.disabled = true;
+                return;
+            }
             
-            sections = [
-                words.slice(0, sectionSize).join(' '),
-                words.slice(sectionSize, sectionSize * 2).join(' '),
-                words.slice(sectionSize * 2).join(' ')
-            ];
+            // Jeden Button mit dem entsprechenden Abschnitt verknüpfen
+            for (let i = 0; i < Math.min(3, sectionFiles.length); i++) {
+                const audioPlayer = new Audio(`/audio/${sectionFiles[i]}`);
+                sectionAudioPlayers.push(audioPlayer);
+                
+                const sectionButton = document.getElementById(`section${i+1}-button`);
+                sectionButton.disabled = false;
+                
+                // Event-Listener für Abschnitts-Button
+                sectionButton.addEventListener('click', (function(index) {
+                    return function() {
+                        // Alle anderen Audio-Player pausieren
+                        fullAudioPlayer.pause();
+                        sectionAudioPlayers.forEach((player, idx) => {
+                            if (idx !== index) player.pause();
+                        });
+                        
+                        // Diesen Abschnitt abspielen oder pausieren
+                        const player = sectionAudioPlayers[index];
+                        if (player.paused) {
+                            player.play();
+                        } else {
+                            player.pause();
+                        }
+                    };
+                })(i));
+            }
             
-            // Abschnitt-Buttons Beschriftung aktualisieren
-            section1Button.textContent = "1";
-            section2Button.textContent = "2";
-            section3Button.textContent = "3";
-            
-            // Status aktualisieren
-            if (audioStatus) {
-                audioStatus.textContent = "Diktat bereit. Klicke auf 'Abspielen' zum Starten.";
+            // Verbleibende Buttons deaktivieren, falls weniger als 3 Abschnitte
+            for (let i = sectionFiles.length; i < 3; i++) {
+                document.getElementById(`section${i+1}-button`).disabled = true;
             }
         }
-        
-        // Ganzes Diktat abspielen
-        playButton.addEventListener('click', function() {
-            if (window.diktatFullText) {
-                // Text mit ausgesprochenen Satzzeichen vorbereiten
-                const textWithPunctuation = replacePunctuationWithWords(window.diktatFullText);
-                
-                // Text abspielen
-                speakText(textWithPunctuation, window.diktatSpeed);
-            } else {
-                if (audioStatus) audioStatus.textContent = "Fehler: Kein Diktattext vorhanden";
-            }
-        });
-        
-        // Abschnitt 1 abspielen
-        section1Button.addEventListener('click', function() {
-            if (sections.length > 0) {
-                const textWithPunctuation = replacePunctuationWithWords(sections[0]);
-                speakText(textWithPunctuation, window.diktatSpeed);
-            }
-        });
-        
-        // Abschnitt 2 abspielen
-        section2Button.addEventListener('click', function() {
-            if (sections.length > 1) {
-                const textWithPunctuation = replacePunctuationWithWords(sections[1]);
-                speakText(textWithPunctuation, window.diktatSpeed);
-            }
-        });
-        
-        // Abschnitt 3 abspielen
-        section3Button.addEventListener('click', function() {
-            if (sections.length > 2) {
-                const textWithPunctuation = replacePunctuationWithWords(sections[2]);
-                speakText(textWithPunctuation, window.diktatSpeed);
-            }
-        });
         
         // Diktat überprüfen
         dictationForm.addEventListener('submit', async function(e) {
@@ -897,18 +519,8 @@
                 resultSection.style.display = 'block';
                 
                 // Audio pausieren
-                if (window.currentAudioElement) {
-                    window.currentAudioElement.pause();
-                    window.currentAudioElement = null;
-                }
-                
-                if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
-                    responsiveVoice.cancel();
-                }
-                
-                if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                    window.speechSynthesis.cancel();
-                }
+                fullAudioPlayer.pause();
+                sectionAudioPlayers.forEach(player => player.pause());
                 
                 // Button-Status zurücksetzen
                 submitButton.textContent = 'Überprüfen';
@@ -933,51 +545,21 @@
             dictationIdInput.value = '';
             dictationInput.value = '';
             
-            // Audio zurücksetzen
-            if (window.currentAudioElement) {
-                window.currentAudioElement.pause();
-                window.currentAudioElement = null;
-            }
+            // Audio pausieren
+            fullAudioPlayer.pause();
+            sectionAudioPlayers.forEach(player => player.pause());
             
-            if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying()) {
-                responsiveVoice.cancel();
-            }
+            // Audio-Objekte zurücksetzen
+            fullAudioPlayer.src = '';
+            sectionAudioPlayers = [];
             
-            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
-            }
-            
-            window.diktatFullText = null;
             currentDictationId = null;
-            sections = [];
-            
-            if (audioStatus) {
-                audioStatus.textContent = "Bereit für Sprachausgabe";
-            }
         });
-    </script>
-    
-    <!-- ResponsiveVoice Script -->
-    <script src="https://code.responsivevoice.org/responsivevoice.js?key=0qee8GKV"></script>
-    <script>
-        // Funktion, die nach dem Laden von ResponsiveVoice ausgeführt werden soll
-        if (typeof responsiveVoice !== 'undefined') {
-            console.log("ResponsiveVoice wurde geladen!");
-            
-            // Audio-Kontext für Mobile entsperren beim ersten Laden
-            try {
-                if (responsiveVoice.clickEvent) {
-                    responsiveVoice.clickEvent();
-                }
-                
-                // Verfügbare Stimmen anzeigen
-                if (responsiveVoice.getVoices) {
-                    console.log("Verfügbare Stimmen beim Laden:", responsiveVoice.getVoices().map(v => v.name));
-                }
-            } catch (e) {
-                console.error("Fehler beim initialen ResponsiveVoice Setup:", e);
-            }
-        }
+        
+        // Der vollständige Audio-Player soll alle anderen pausieren, wenn er abgespielt wird
+        fullAudioPlayer.addEventListener('play', function() {
+            sectionAudioPlayers.forEach(player => player.pause());
+        });
     </script>
 </body>
 </html>
