@@ -381,12 +381,22 @@
         let studentName = '';
         let sections = [];
         
+        // Deutsche Stimme (Aria von Eleven Labs)
+        const GERMAN_VOICE_ID = "9BWtsMINqrJLrRacOk9x";
+        
         // Funktion zum Aufrufen der Eleven Labs API über Backend-Proxy
-        async function speakWithElevenLabs(text, voiceId = "NLdsrIcUBS4NcgKkzSzj") { // Nicole (Deutsch)
+        async function speakWithElevenLabs(text, voiceId = GERMAN_VOICE_ID) {
             try {
                 // Status aktualisieren
                 if (audioStatus) {
                     audioStatus.textContent = "Eleven Labs API wird angerufen...";
+                }
+                
+                // Text kürzen, falls er zu lang ist
+                if (text.length > 300) {
+                    text = text.substring(0, 300) + "...";
+                    console.log("Text wurde gekürzt, um API-Limits einzuhalten");
+                    if (audioStatus) audioStatus.textContent += " (Text gekürzt)";
                 }
                 
                 // Unseren Backend-Proxy statt direkt die Eleven Labs API aufrufen
@@ -402,8 +412,15 @@
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => null);
-                    throw new Error(`Eleven Labs API error: ${response.status} ${errorData ? JSON.stringify(errorData) : ''}`);
+                    let errorText = `HTTP ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        console.error("Error response:", errorData);
+                        errorText += `: ${errorData.error || "Unbekannter Fehler"}`;
+                    } catch (e) {
+                        errorText += `: ${await response.text() || "Keine Fehlerdetails verfügbar"}`;
+                    }
+                    throw new Error(errorText);
                 }
 
                 // Audio-Daten als arrayBuffer erhalten
@@ -431,15 +448,30 @@
                 
                 audioElement.onerror = (e) => {
                     console.error("Error playing Eleven Labs audio:", e);
-                    if (audioStatus) audioStatus.textContent = "Fehler bei der Wiedergabe: " + e.message;
+                    if (audioStatus) audioStatus.textContent = "Fehler bei der Wiedergabe: " + (e.message || "Unbekannter Fehler");
                     URL.revokeObjectURL(audioUrl);
+                    throw new Error("Fehler bei der Audio-Wiedergabe: " + (e.message || "Unbekannter Fehler"));
                 };
 
                 // Audio-Element in einer globalen Variable speichern für potenzielle Stornierung
                 window.currentAudioElement = audioElement;
                 
-                // Audio abspielen
-                audioElement.play();
+                // Versuch, das Audio abzuspielen - auf iOS möglicherweise ein Problem
+                try {
+                    const playPromise = audioElement.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(e => {
+                            console.error("Play promise rejected:", e);
+                            if (audioStatus) audioStatus.textContent = "Fehler beim Starten der Wiedergabe: " + e;
+                            // iOS erfordert oft Benutzerinteraktion, bevor Audio abgespielt werden kann
+                            if (audioStatus) audioStatus.textContent += " (Tippe auf den Bildschirm und versuche es erneut)";
+                        });
+                    }
+                } catch (e) {
+                    console.error("Error during play():", e);
+                    if (audioStatus) audioStatus.textContent = "Fehler beim Abspielen: " + e;
+                    return false;
+                }
                 
                 return true; // Erfolg
             } catch (error) {
@@ -514,12 +546,8 @@
                 audioStatus.textContent = "Sprachausgabe wird vorbereitet...";
             }
             
-            // Für deutschen Text eine deutsche Stimme-ID verwenden
-            // Nicole - deutsche Stimme
-            const germanVoiceId = "NLdsrIcUBS4NcgKkzSzj";
-            
             // Zuerst Eleven Labs versuchen
-            const elevenLabsSuccess = await speakWithElevenLabs(text, germanVoiceId);
+            const elevenLabsSuccess = await speakWithElevenLabs(text, GERMAN_VOICE_ID);
             
             // Wenn Eleven Labs fehlschlägt, auf ResponsiveVoice zurückfallen
             if (!elevenLabsSuccess) {
